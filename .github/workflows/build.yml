@@ -29,7 +29,7 @@ jobs:
           RESULT=$?
           cat e2e.log
           if [ "$RESULT" -ne 0 ]; then
-            node -e "let s=require('fs').readFileSync('e2e.log','utf8').slice(-12000);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
+            node -e "let s=require('fs').readFileSync('e2e.log','utf8').slice(-3500);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
             exit "$RESULT"
           fi
       - uses: actions/upload-artifact@v4
@@ -64,11 +64,11 @@ jobs:
         run: |
           chmod +x gradlew
           set +e
-          ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon > gradle.log 2>&1
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon > gradle.log 2>&1
           RESULT=$?
           tail -150 gradle.log
           if [ "$RESULT" -ne 0 ]; then
-            node -e "let s=require('fs').readFileSync('gradle.log','utf8').slice(-12000);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
+            node -e "let s=require('fs').readFileSync('gradle.log','utf8').slice(-3500);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
             exit "$RESULT"
           fi
       - uses: actions/upload-artifact@v4

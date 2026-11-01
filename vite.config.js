@@ -18,6 +18,24 @@ export default defineConfig({
   plugins: [
     {
       name: "offline-shell",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const path = new URL(req.url, "http://localhost").pathname;
+          const match = path.match(
+            /^\/(standard_fonts|cmaps)\/([A-Za-z0-9_.-]+)$/,
+          );
+          if (!match || match[2] === "..") return next();
+          try {
+            const data = readFileSync(
+              "node_modules/pdfjs-dist/" + match[1] + "/" + match[2],
+            );
+            res.setHeader("Content-Type", "application/octet-stream");
+            res.end(data);
+          } catch {
+            next();
+          }
+        });
+      },
       generateBundle(_, bundle) {
         const resources = [];
         for (const dir of ["standard_fonts", "cmaps"])
