@@ -725,6 +725,14 @@ function showStudio() {
       $("#eraserLabel").textContent = eraserWidth + "px";
     };
   }
+  el.insertAdjacentHTML(
+    "beforeend",
+    btn("studioUndo", "undo-2", "Undo stroke") +
+      btn("studioRedo", "redo-2", "Redo stroke"),
+  );
+  $("#studioUndo").onclick = () => ann.undo();
+  $("#studioRedo").onclick = () => ann.redo();
+  refreshIcons();
   $("#clearInk").onclick = () =>
     confirmDialog(
       "Clear this page’s highlights?",
@@ -1347,7 +1355,7 @@ surface.addEventListener(
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     surface.setPointerCapture(e.pointerId);
     if (pointers.size === 2) {
-      if (gesture?.drawing) ann.finish();
+      if (gesture?.drawing) ann.cancel();
       clearTimeout(holdTimer);
       if (curl.running) {
         curl.running = false;
@@ -1496,7 +1504,9 @@ async function pointerEnd(e, cancel = false) {
   }
   if (g.curl) {
     const distance = Math.hypot(e.clientX - g.startX, e.clientY - g.startY),
-      vx = g.velocity * (g.reverse ? -1 : 1),
+      vx =
+        (performance.now() - g.lastTime > 90 ? 0 : g.velocity) *
+        (g.reverse ? -1 : 1),
       progress = (curl.w - curl.p.x) / (2 * curl.w);
     const complete = !cancel && (progress > 0.28 || vx < -0.45 || distance < 7);
     turning = true;
@@ -1547,9 +1557,6 @@ $("#bookViewport").addEventListener(
   },
   { passive: false },
 );
-$("#rightPage").addEventListener("dblclick", (e) => {
-  if (tool === "hand" && !turning) setZoom(zoom === 1 ? 2 : 1);
-});
 on("exitFocus", () => {
   document.body.classList.remove("focus-mode");
   cache.clear();

@@ -1890,7 +1890,7 @@ textarea {
     width: 57px;
   }
   .studio > #brushWidth {
-    display: none;
+    display: block;
   }
   .studio > label {
     font-size: 9px;
@@ -2040,4 +2040,9 @@ textarea {
 }
 :root[data-theme="ink"] #curlCanvas {
   filter: grayscale(1) contrast(1.35);
+}
+
+.studio #studioUndo,
+.studio #studioRedo {
+  margin-left: 0;
 }

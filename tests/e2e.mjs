@@ -150,6 +150,41 @@ try {
   await pageNum(3);
   await p.waitForTimeout(350);
   console.log("PASS mobile edge drag and spring-completed canvas curl");
+  r = await p.locator("#rightPage").boundingBox();
+  await p.mouse.dblclick(r.x + r.width * 0.5, r.y + r.height * 0.4, {
+    delay: 80,
+  });
+  await p.waitForTimeout(500);
+  assert.equal(await p.locator("#zoomValue").textContent(), "200%");
+  await p.locator("#zoomValue").click();
+  await p.waitForTimeout(450);
+  const cdp = await context.newCDPSession(p);
+  r = await p.locator("#rightPage").boundingBox();
+  const cx = r.x + r.width * 0.5,
+    cy = r.y + r.height * 0.5;
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { x: cx - 30, y: cy, id: 1 },
+      { x: cx + 30, y: cy, id: 2 },
+    ],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [
+      { x: cx - 60, y: cy, id: 1 },
+      { x: cx + 60, y: cy, id: 2 },
+    ],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await p.waitForTimeout(500);
+  assert.equal(await p.locator("#zoomValue").textContent(), "200%");
+  await p.locator("#zoomValue").click();
+  await p.waitForTimeout(450);
+  console.log("PASS double-tap and multi-touch pinch zoom");
   await p.locator("#focus").click();
   assert.equal(await p.locator("#exitFocus").isVisible(), true);
   await p.locator("#exitFocus").click();

@@ -81,6 +81,12 @@ export class AnnotationEngine {
     this.active.straight = true;
     this.render();
   }
+  cancel() {
+    if (!this.active) return;
+    this.items = this.undoStack.pop() || this.items;
+    this.active = null;
+    this.render();
+  }
   finish() {
     if (!this.active) return;
     if (this.active.tool !== "stroke") this.items.push(this.active);
