@@ -1,4 +1,4 @@
-import {createHash} from "node:crypto";
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 export default defineConfig({
@@ -31,7 +31,7 @@ export default defineConfig({
         this.emitFile({
           type: "asset",
           fileName: "sw.js",
-          source: `const CACHE='flipvault-${createHash("sha256").update(version).digest("hex").slice(0,16)}';const FILES=${JSON.stringify(["./", "./icon.svg", "./manifest.webmanifest", ...[...new Set([...files, ...resources])].map((f) => "./" + f)])};self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('flipvault-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;e.respondWith(caches.match(e.request,{ignoreVary:true}).then(c=>c||fetch(e.request).catch(()=>e.request.mode==='navigate'?caches.match('./'):Response.error())));});`,
+          source: `const CACHE='flipvault-${createHash("sha256").update(version).digest("hex").slice(0, 16)}';const FILES=${JSON.stringify(["./", "./icon.svg", "./icon-192.png", "./icon-512.png", "./manifest.webmanifest", ...[...new Set([...files, ...resources])].map((f) => "./" + f)])};self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('flipvault-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;e.respondWith(caches.match(e.request,{ignoreVary:true}).then(c=>c||fetch(e.request).catch(()=>e.request.mode==='navigate'?caches.match('./'):Response.error())));});`,
         });
       },
     },

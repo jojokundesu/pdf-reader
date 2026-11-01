@@ -22,7 +22,7 @@ jobs:
       - name: Browser integration & offline tests
         run: |
           npm run preview -- --port 4173 &
-          npx wait-on http://localhost:4173
+          npx wait-on --timeout 30000 http-get://localhost:4173
           TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +47,7 @@ jobs:
       - run: npx cap sync android
       - name: Assemble installable Android preview
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        run: chmod +x gradlew && ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: FlipVault-Pro-Android
