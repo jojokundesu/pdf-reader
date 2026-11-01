@@ -36,6 +36,8 @@ jobs:
           name: FlipVault-Pro-web
           path: dist
   android:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs: verify
     steps:
@@ -59,3 +61,14 @@ jobs:
         with:
           name: FlipVault-Pro-Android
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish downloadable preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk FlipVault-Pro-Android-preview.apk
+          (cd dist && zip -q -r ../FlipVault-Pro-web.zip .)
+          TAG="preview-${GITHUB_SHA:0:7}"
+          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+            --title "FlipVault Pro · Android preview ${GITHUB_SHA:0:7}" \
+            --notes "Install FlipVault-Pro-Android-preview.apk on Android, or host the web ZIP on HTTPS. The APK is a debug-signed sideload preview, not a Play Store release. Browser integration and offline tests passed; physical Realme 9i testing is still needed. Back up your vault before uninstalling or replacing an earlier preview. See README for features, backup/recovery instructions and known limitations." \
+            FlipVault-Pro-Android-preview.apk FlipVault-Pro-web.zip

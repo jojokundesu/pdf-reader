@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+mkdirSync("test-results", { recursive: true });
 import assert from "node:assert/strict";
 import { launch } from "./browser.mjs";
 import { PDFDocument } from "pdf-lib";
@@ -143,7 +145,7 @@ try {
     await p.locator("#curlCanvas").evaluate((c) => getComputedStyle(c).display),
     "block",
   );
-  await p.screenshot({ path: "/home/user/curl-mobile.png" });
+  await p.screenshot({ path: "test-results/curl-mobile.png" });
   await p.mouse.up();
   await pageNum(3);
   await p.waitForTimeout(350);
@@ -152,7 +154,7 @@ try {
   assert.equal(await p.locator("#exitFocus").isVisible(), true);
   await p.locator("#exitFocus").click();
   console.log("PASS mobile focus mode has accessible exit");
-  await p.screenshot({ path: "/home/user/flipvault-mobile-final.png" });
+  await p.screenshot({ path: "test-results/mobile-final.png" });
   assert.deepEqual(errors, []);
   console.log("PASS no uncaught browser errors");
   if (process.env.TEST_OFFLINE) {
