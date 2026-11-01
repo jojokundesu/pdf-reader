@@ -23,7 +23,14 @@ jobs:
         run: |
           npm run preview -- --port 4173 &
           npx wait-on --timeout 30000 http-get://localhost:4173
-          TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
+          set +e
+          TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e > e2e.log 2>&1
+          RESULT=$?
+          cat e2e.log
+          if [ "$RESULT" -ne 0 ]; then
+            node -e "let s=require('fs').readFileSync('e2e.log','utf8').slice(-12000);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
+            exit "$RESULT"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: FlipVault-Pro-web
