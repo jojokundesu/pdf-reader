@@ -22,7 +22,7 @@ On Android Chrome, a hosted app can also be installed using the browser menu →
 - Original, sepia, AMOLED and e-ink themes; auto/single/spread layouts; RTL controls; 1–4× pinch/wheel/double-click zoom; zoomed-page panning; edge and keyboard navigation while marking.
 - Procedural Web Audio page sounds with mute. Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
 - Annotated PDF export with multiply-blended highlights; printable PDF summary of marked pages; native Android share/save sheet.
-- Bundled worker, standard fonts and CMaps; no analytics, account, external font, audio or AI service.
+- Bundled compatibility-build PDF worker, standard fonts and CMaps; no analytics, account, external font, audio or AI service.
 
 The first launch generates a real 12-page vector PDF, **The art of paying attention**, locally. It is a usable sample book, not a remote dependency. Use **+** to import your own PDFs.
 
@@ -61,7 +61,7 @@ High-resolution PDF canvases are cached only within `currentPage ± 2`. Individu
 - ETA is based on elapsed reading time and pages traversed, not an AI estimate or eye tracking.
 - PDF export rasterizes highlight ink and prints paperclip labels using PDF standard text; Unicode labels outside that font are replaced in the export, while their originals remain intact in the vault. Original PDF content remains vector.
 - Encrypted/password-protected PDFs are rejected with an error. No OCR, cloud synchronization, or account recovery is implied.
-- Browser integration is tested in headless Chromium at desktop and 393×830 mobile viewports. Android builds are assembled in CI. Physical Realme 9i testing has not been performed.
+- Browser integration is tested in headless Chromium at desktop and 393×830 mobile viewports. Android builds are assembled in CI. A synthetic 1,000-page text PDF import/random-navigation smoke test also passes at mobile viewport size; this is not a benchmark of an image-heavy novel. Physical Realme 9i testing has not been performed. Keep Android System WebView updated; the PDF compatibility build includes polyfills for older mobile engines.
 
 ## Development
 
@@ -74,6 +74,7 @@ npm test                            # geometry + storage + hostile-backup valida
 npm run build                       # production bundle and offline shell
 npm run preview -- --port 4173
 TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
+npm run test:large                   # synthetic 1,000-page import/navigation
 npx cap sync android                # rebuild web assets first
 cd android && ./gradlew assembleDebug
 ```

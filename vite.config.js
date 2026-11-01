@@ -7,7 +7,12 @@ export default defineConfig({
   preview: { host: "0.0.0.0", allowedHosts: [".e2b.app"] },
   build: {
     rollupOptions: {
-      output: { manualChunks: { pdfjs: ["pdfjs-dist"], pdflib: ["pdf-lib"] } },
+      output: {
+        manualChunks: {
+          pdfjs: ["pdfjs-dist/legacy/build/pdf.mjs"],
+          pdflib: ["pdf-lib"],
+        },
+      },
     },
   },
   plugins: [
@@ -17,7 +22,6 @@ export default defineConfig({
         const resources = [];
         for (const dir of ["standard_fonts", "cmaps"])
           for (const name of readdirSync("node_modules/pdfjs-dist/" + dir)) {
-            if (name === "LICENSE") continue;
             const fileName = dir + "/" + name;
             this.emitFile({
               type: "asset",

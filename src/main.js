@@ -99,8 +99,8 @@ const icons = {
   Volume2,
   VolumeX,
 };
-import * as pdfjs from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { PDFDocument, BlendMode } from "pdf-lib";
 import * as store from "./storage";
 import { AnnotationEngine } from "./annotations";
