@@ -1,0 +1,7 @@
+{
+  "appId": "com.flipvault.pro",
+  "appName": "FlipVault Pro",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false, "backgroundColor": "#172827" }
+}

@@ -1,0 +1,54 @@
+name: Test web app & build Android APK
+on:
+  push:
+    branches: [arena/80cef757-pdf-reader, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm test
+      - run: npm run build
+      - run: node --check dist/sw.js
+      - name: Browser integration & offline tests
+        run: |
+          npm run preview -- --port 4173 &
+          npx wait-on http://localhost:4173
+          TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlipVault-Pro-web
+          path: dist
+  android:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Assemble installable Android preview
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlipVault-Pro-Android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
