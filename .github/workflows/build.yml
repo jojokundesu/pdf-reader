@@ -1,0 +1,137 @@
+name: Verify app & publish only persistently signed Android releases
+on:
+  push:
+    branches: [arena/80cef757-pdf-reader, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm test
+      - run: npm run build
+      - run: node --check dist/sw.js
+      - name: Browser integration & offline tests
+        run: |
+          npm run preview -- --port 4173 &
+          npx wait-on --timeout 30000 http-get://localhost:4173
+          set +e
+          export TEST_URL=http://localhost:4173 TEST_OFFLINE=1
+          (npm run test:e2e && npm run test:update && npm run test:audio && npm run test:large) > e2e.log 2>&1
+          RESULT=$?
+          cat e2e.log
+          if [ "$RESULT" -ne 0 ]; then
+            node -e "let s=require('fs').readFileSync('e2e.log','utf8').slice(-3500);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
+            exit "$RESULT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlipVault-Pro-web
+          path: dist
+  android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    needs: verify
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Use runner Android SDK
+        run: |
+          test -d "$ANDROID_HOME"
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Validate persistent signing identity
+        id: signing
+        env:
+          FLIPVAULT_ANDROID_KEYSTORE_BASE64: ${{ secrets.FLIPVAULT_ANDROID_KEYSTORE_BASE64 }}
+          FLIPVAULT_ANDROID_STORE_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_STORE_PASSWORD }}
+          FLIPVAULT_ANDROID_KEY_ALIAS: ${{ secrets.FLIPVAULT_ANDROID_KEY_ALIAS }}
+          FLIPVAULT_ANDROID_KEY_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_KEY_PASSWORD }}
+          FLIPVAULT_ANDROID_CERT_SHA256: ${{ vars.FLIPVAULT_ANDROID_CERT_SHA256 }}
+        run: node scripts/android-signing.mjs prepare
+      - name: Assemble release and compile instrumentation tests
+        env:
+          FLIPVAULT_ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+          FLIPVAULT_ANDROID_STORE_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_STORE_PASSWORD }}
+          FLIPVAULT_ANDROID_KEY_ALIAS: ${{ secrets.FLIPVAULT_ANDROID_KEY_ALIAS }}
+          FLIPVAULT_ANDROID_KEY_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_KEY_PASSWORD }}
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set +e
+          ./gradlew :app:assembleRelease :app:assembleDebugAndroidTest --no-daemon > gradle.log 2>&1
+          RESULT=$?
+          tail -150 gradle.log
+          if [ "$RESULT" -ne 0 ]; then
+            node -e "let s=require('fs').readFileSync('gradle.log','utf8').slice(-3500);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
+            exit "$RESULT"
+          fi
+      - name: Independently verify APK signing certificate
+        if: steps.signing.outputs.configured == 'true'
+        env:
+          FLIPVAULT_ANDROID_CERT_SHA256: ${{ vars.FLIPVAULT_ANDROID_CERT_SHA256 }}
+        run: node scripts/android-signing.mjs verify-apk android/app/build/outputs/apk/release/app-release.apk
+      - name: Upload signed Android artifact
+        if: steps.signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlipVault-Pro-Android-signed
+          path: android/app/build/outputs/apk/release/app-release.apk
+      - name: Upload unsigned verification artifact (not installable)
+        if: steps.signing.outputs.configured != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlipVault-Pro-Android-UNSIGNED-NOT-INSTALLABLE
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Publish verified signed release
+        if: steps.signing.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk FlipVault-Pro-Android.apk
+          (cd dist && zip -q -r ../FlipVault-Pro-web.zip .)
+          TAG="signed-${GITHUB_SHA:0:7}"
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
+          {
+            sed -e "s/{{VERSION}}/$VERSION/g" -e "s/{{BRANCH}}/${GITHUB_REF_NAME}/g" docs/release-notes.md
+            cat <<'NOTES'
+
+          ---
+
+          ## Signing and updates
+
+          This APK was signed with the configured persistent key and independently checked against the pinned
+          SHA-256 signing certificate before publication. In-place upgrades require that the installed app has
+          this same signing identity and a lower version code. Legacy temporary-key debug previews cannot be
+          converted into compatible updates without their original private key; export a vault backup and keep the
+          original PDFs before migrating. This workflow performs no device-level install or upgrade test.
+          NOTES
+          } > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+            --title "FlipVault Pro $VERSION · Persistently signed Android build" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            FlipVault-Pro-Android.apk FlipVault-Pro-web.zip FlipVault-Pro-signing-certificate.sha256
+      - name: Remove temporary private signing material
+        if: always() && steps.signing.outputs.keystore_path != ''
+        env:
+          KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+        run: rm -f -- "$KEYSTORE_PATH"

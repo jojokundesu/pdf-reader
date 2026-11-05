@@ -1,0 +1,82 @@
+apply plugin: 'com.android.application'
+
+// Signing identity is injected from protected CI secrets, never generated here.
+def signingEnvironment = [
+    'FLIPVAULT_ANDROID_KEYSTORE_PATH',
+    'FLIPVAULT_ANDROID_STORE_PASSWORD',
+    'FLIPVAULT_ANDROID_KEY_ALIAS',
+    'FLIPVAULT_ANDROID_KEY_PASSWORD'
+]
+def sideBySidePreview = project.findProperty('flipvaultSideBySidePreview') == 'true'
+
+def hasReleaseSigning = signingEnvironment.every { System.getenv(it) }
+if (signingEnvironment.any { System.getenv(it) } && !hasReleaseSigning) {
+    throw new GradleException('Incomplete persistent Android release signing configuration. No fallback key is permitted.')
+}
+
+
+android {
+    namespace "com.flipvault.pro"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId sideBySidePreview ? "com.flipvault.pro.preview" : "com.flipvault.pro"
+        manifestPlaceholders = [flipvaultAppLabel: sideBySidePreview ? 'FlipVault Preview' : 'FlipVault Pro']
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 4
+        versionName "1.2.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            persistentRelease {
+                storeFile file(System.getenv('FLIPVAULT_ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('FLIPVAULT_ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('FLIPVAULT_ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('FLIPVAULT_ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (hasReleaseSigning) signingConfig signingConfigs.persistentRelease
+            debuggable false
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
