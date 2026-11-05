@@ -65,7 +65,7 @@ test("finished APK must have exactly one signer matching the pin", () => {
   );
   assert.throws(() => verifyApkCertificate("unsigned", fingerprint));
 });
-test("CI publishes only the certificate-verified release APK, never disposable debug output", () => {
+test("main-app CI publishes only the certificate-verified release APK, never disposable debug output", () => {
   const workflow = readFileSync(
     new URL("../.github/workflows/build.yml", import.meta.url),
     "utf8",

@@ -12,3 +12,7 @@ keystore.properties
 .env.*
 !*.example
 FlipVault-Pro-signing-certificate.sha256
+
+*.p12
+*.pfx
+.flipvault-signing-backup/

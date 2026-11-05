@@ -14,7 +14,7 @@ If the private key for a particular installed preview exists in a separate backu
 
 ## Corrected release policy
 
-- Never publish debug APKs from disposable runner keys.
+- Never publish **main-app** debug APKs from disposable runner keys. The explicitly requested side-by-side test exception below uses a different package ID.
 - Use one privately retained release keystore, supplied from protected GitHub Actions secrets.
 - Pin its public SHA-256 signing-certificate fingerprint independently in a repository variable.
 - Check the keystore's private-key entry and pinned certificate **before** building.
@@ -24,6 +24,41 @@ If the private key for a particular installed preview exists in a separate backu
 - Temporary decoded keystores are written with private file permissions on the runner and deleted after the job. They are not put in Git, artifacts, release assets or caches. The persistent source is the protected secret plus the maintainer's independent offline backup.
 
 The workflow compiles instrumentation tests but does not run an on-device upgrade test. Actual installation/update verification remains a separate step.
+
+## Fastest setup from an Android phone (no PC required)
+
+Use a private **GitHub Codespace**, not the public repository, this chat, or an Actions job, to create the permanent key. Codespaces can consume GitHub quota; check your account's limits before creating one.
+
+1. On GitHub, open this repository and select branch **`arena/80cef757-pdf-reader`**. Choose **Code → Codespaces → Create codespace** (on a phone, the browser's desktop-site mode can help).
+2. In its terminal run:
+   ```sh
+   node scripts/setup-android-signing.mjs
+   ```
+   This uses the Codespace's existing GitHub CLI login, checks for an existing configuration, creates a private RSA keystore only once, saves private recovery files **outside the repository**, and attempts to provision the four secrets and the public certificate pin. It never prints the private key or passwords. **Do not run this if you have an original signing-key backup you want to preserve; configure that existing key instead.**
+3. If it says a JDK is missing, run the printed JDK installation command, then retry. If GitHub denies secret administration **before a private backup folder is created**, run:
+   ```sh
+   node scripts/setup-android-signing.mjs --generate-only
+   ```
+   No GitHub permissions or access tokens need to be sent in chat. The helper prints the path of a private folder, not its secret contents. If the first attempt already printed a private backup folder, use those existing files or `--resume` instead: do not generate another key after a partially completed upload.
+4. In the Codespace choose **File → Open Folder**, open that printed folder, and use Explorer to open/download the needed files. In GitHub **Settings → Secrets and variables → Actions → Secrets → New repository secret**, create the four names in the table below. Paste the contents of each matching `.txt` file into its secret field. Then use **Variables → New repository variable** to create `FLIPVAULT_ANDROID_CERT_SHA256` from its matching file. The keystore Base64 must be copied in full. Do not commit these files or paste them into an issue, pull request, or chat.
+5. **Before deleting the Codespace**, download `flipvault-release.p12`, securely save its passwords in a password manager, and retain an encrypted offline recovery copy. The generated folder includes plaintext credential files for setup: treat the entire folder as sensitive. Do not put it in a public cloud folder or repository.
+6. Open **Actions → Verify app & publish only persistently signed Android releases → Run workflow** and select `arena/80cef757-pdf-reader`. If GitHub has not indexed the manual workflow on this non-default branch, run this in the same authenticated Codespace terminal:
+   ```sh
+   gh workflow run build.yml --ref arena/80cef757-pdf-reader
+   ```
+   If GitHub refuses dispatch before the workflow exists on the default branch, tell the coding agent **“signing configured”** (without sending any values). The agent can trigger a normal push build on the existing working branch; no merge or signing-check removal is required. Once the main build succeeds, a `signed-…` release contains `FlipVault-Pro-Android.apk` and its public certificate fingerprint.
+
+If setup was interrupted **after** it created a key, do not generate another one. Use:
+
+```sh
+node scripts/setup-android-signing.mjs --resume /path/to/the/saved/private/folder
+```
+
+The helper refuses to overwrite a different certificate pin or silently rotate an existing configuration. The `--generate-only` mode cannot inspect GitHub settings; if any signing settings already exist, compare the fingerprints and restore the original backup rather than uploading a replacement.
+
+## Requested side-by-side download exception
+
+A separately named **FlipVault Preview** app (`com.flipvault.pro.preview`) can be built explicitly with `-PflipvaultSideBySidePreview=true` by the dedicated preview workflow. This is a temporary debug-signed download requested for testing the latest audio. It is **not** the main app, does not replace it, does not automatically share its storage, and does not promise in-place preview updates. Its workflow verifies the separate package ID before publishing. Main-app permanent-signing checks remain unchanged.
 
 ## Maintainer setup (GitHub settings, never chat)
 
