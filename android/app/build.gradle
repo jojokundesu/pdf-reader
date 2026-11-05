@@ -14,6 +14,16 @@ if (signingEnvironment.any { System.getenv(it) } && !hasReleaseSigning) {
     throw new GradleException('Incomplete persistent Android release signing configuration. No fallback key is permitted.')
 }
 
+// CI decodes the secret keystore to a temporary file without a format-specific
+// extension, so the keystore type is detected from its leading bytes instead of
+// being guessed from the file name: PKCS#12 starts with a DER SEQUENCE (0x30 0x82),
+// JKS starts with its own magic number (0xFE 0xED 0xFE 0xED).
+def envKeystoreFile = System.getenv('FLIPVAULT_ANDROID_KEYSTORE_PATH') ?
+        file(System.getenv('FLIPVAULT_ANDROID_KEYSTORE_PATH')) : null
+def envKeystoreBytes = envKeystoreFile?.exists() ? envKeystoreFile.bytes : null
+def envKeystoreType = envKeystoreBytes != null && envKeystoreBytes.length > 3 ?
+        (envKeystoreBytes[0] == 0x30 && envKeystoreBytes[1] == 0x82 ? 'pkcs12' : 'jks') : null
+
 
 android {
     namespace "com.flipvault.pro"
@@ -36,6 +46,7 @@ android {
         if (hasReleaseSigning) {
             persistentRelease {
                 storeFile file(System.getenv('FLIPVAULT_ANDROID_KEYSTORE_PATH'))
+                if (envKeystoreType) storeType envKeystoreType
                 storePassword System.getenv('FLIPVAULT_ANDROID_STORE_PASSWORD')
                 keyAlias System.getenv('FLIPVAULT_ANDROID_KEY_ALIAS')
                 keyPassword System.getenv('FLIPVAULT_ANDROID_KEY_PASSWORD')
