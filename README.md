@@ -2,23 +2,17 @@
 
 An offline PDF reader for Android and the web, with canvas page folds, non-destructive highlights, paperclip bookmarks, and an on-device library.
 
-## Page-turn audio
+**[Download for Android](https://github.com/jojokundesu/pdf-reader/releases/latest/download/FlipVault-Pro-Android.apk)** — the installable `FlipVault-Pro-Android.apk` from the latest release.
 
-Page turns use a bundled MP3 recording (83,591 bytes). The recording plays locally without re-encoding or a network request. Its checksum and source details are listed in [`src/assets/README.md`](src/assets/README.md).
+| Platform | Status |
+| --- | --- |
+| Android | Available now |
+| iPhone / iOS | Coming soon |
+| Windows / macOS / Linux | Coming soon |
 
-- The bytes preload without playing; one low-latency AudioContext unlocks on an actual pointer/key gesture and decodes the recording once for reuse.
-- The clip has a very quiet lead-in. Playback skips quiet padding, retains the paper sound and a short natural tail, and uses bounded level adjustment and edge fades. Pitch and playback speed remain unchanged.
-- A committed curl, next/previous navigation, or a direct page jump plays one recording. A canceled peel, spring-back, stationary hold, initial book load, or focus-timer toast does not.
-- Quick turns fade the previous tail instead of piling up recordings. Delayed decoding does not queue stale sounds or block page animations.
-- The speaker button stops current playback when muted and saves the mute preference across books/restarts. Backgrounding stops playback; returning does not replay it.
-- The production service worker precaches the hashed MP3; the Capacitor app packages it with the reader. No internet connection is needed after the web app has cached its assets, or for the bundled native reader.
-- If loading, decoding or browser audio permission fails, reading still works; the next speaker/user gesture can retry. A slow first-ever load can skip that turn's sound rather than play it late.
+The web app also runs in any modern browser — see [For developers](#for-developers).
 
-`npm run test:audio` exercises real browser MP3 decoding, trusted-gesture startup, page/keyboard/jump playback, silent canceled turns, persistent mute, background handling and offline playback. Unit tests additionally cover overlapping voices, gain/trim analysis, retry failures and stale/pending requests. Browser tests inspect actual Web Audio scheduling; they are not a physical-device listening test.
-
-Version 1.2.0 uses Android version code **4**. Main-app APK releases require a configured, verified signing identity; the separate preview uses its own package ID.
-
-## Page gestures & appearance
+## What it does
 
 - **Grab anywhere in Read mode:** tap/hold the middle, upper or lower area of a page, then drag horizontally. Drag left for next and right for previous; Manga mode reverses this. The direction follows your movement, not which half you touched. Both leaves of a desktop spread accept the gesture.
 - **No accidental flips:** a stationary hold and a vertical movement do nothing. Tiny interior drags spring back. A deliberate drag of roughly 22% of the displayed page width, or a short brisk flick, completes the turn. Corner/edge peels still use their original fold-progress threshold.
@@ -29,30 +23,6 @@ Version 1.2.0 uses Android version code **4**. Main-app APK releases require a c
 
 Select the **hand / Read** tool for anywhere-grab turns. With a marker/eraser selected, a one-finger interior drag still edits ink; use edge gestures, the on-screen arrows or two-finger navigation to turn pages. Above 100% zoom, a one-finger drag pans instead of flipping; return to 100% or use the navigation arrows to turn.
 
-## Android updates
-
-Android updates must retain the application ID (`com.flipvault.pro`) and signing certificate, with a higher version code for each release. The release workflow checks the keystore against a pinned SHA-256 certificate fingerprint and independently verifies the signed APK before publication. Missing signing configuration produces an unsigned verification artifact; invalid configuration blocks publication. The build never generates a replacement release key.
-
-The current release configuration uses GitHub Actions secrets for the private keystore and passwords, plus a repository variable for the public certificate fingerprint. Android itself does not require GitHub secrets: a persistent keystore can be supplied from any storage location. Committing a signing key publicly also makes it reusable, but allows anyone to sign APKs with the same identity. See [Android signing](docs/android-signing.md) for private-key setup, backup, and continuity checks.
-
-Legacy debug previews used temporary signing keys that were not retained. They cannot receive an in-place update signed by a new key. Export a vault backup and keep the original PDFs before migrating; a vault does not contain PDF files. The separate **FlipVault Preview** package can be installed without removing the original app, but has independent storage.
-
-### How a release is published
-
-A push to `main` runs the full test suite, the browser/offline/large-document suites and the Android build. When a persistent signing key is configured, the workflow also publishes a release containing `FlipVault-Pro-Android.apk`, the web build and the public certificate fingerprint. The release page carries the app description and usage guide from [docs/release-notes.md](docs/release-notes.md), so the download page explains what the app is and how to use it. Without signing configuration the same workflow produces only an unsigned verification artifact and publishes no release.
-
-## Get the app
-
-- **Android preview:** [Download FlipVault Preview 1.2.0](https://github.com/jojokundesu/pdf-reader/releases/download/side-preview-6bec6cc/FlipVault-Pro-1.2.0-side-by-side-preview.apk). Package `com.flipvault.pro.preview` installs alongside FlipVault Pro with separate books and notes. This temporary debug-signed build is not the main-app update channel.
-
-- **Android:** Future installable releases use `FlipVault-Pro-Android.apk`, published only after persistent signing is configured and verified. Older `FlipVault-Pro-Android-preview.apk` assets are legacy debug builds with potentially incompatible signing keys. Main-app signed releases still require setup; see [Android signing](docs/android-signing.md).
-- **Browser:** `npm ci && npm run dev`. Open the displayed URL. For an offline/installable production app, run `npm run build && npm run preview`.
-- **Static hosting:** Unzip the web release onto an HTTPS static host. For GitHub Pages, enable **Settings → Pages → Source: GitHub Actions**, then deploy the subpath production build through a Pages workflow. The expected URL is `https://jojokundesu.github.io/pdf-reader/`. Pages must be enabled by a repository administrator.
-
-On Android Chrome, a hosted app can also be installed using the browser menu → **Add to home screen → Install**. The APK includes the complete reader and PDF engine, so no hosted website or internet connection is needed for reading.
-
-## Reading & study tools
-
 - PDF import via file picker or desktop drop; content-derived SHA-256 identification; multiple-book bookshelf; exact last-book/page restoration.
 - Perpendicular-bisector fold geometry, spine constraints, reflected translucent backface, crease/specular/cast shadows, velocity-sensitive completion and critically damped spring return. No `rotateY` door animation.
 - Independent PDF, multiply/screen ink, and paperclip UI layers. Marker strokes use a temporary full-opacity buffer and apply alpha only once per stroke.
@@ -61,9 +31,9 @@ On Android Chrome, a hosted app can also be installed using the browser menu →
 - Six paperclip finishes, top/right/bottom placement, draggable edge positions, editable notes, full-book bookmark tabs and a notes drawer.
 - PDF.js full-text search with snippets and a destination-page pulse; lazy WebP thumbnail filmstrip with annotation/bookmark indicators.
 - Original, sepia, AMOLED and e-ink themes; auto/single/spread layouts; RTL controls; 1–4× pinch/wheel/double-click zoom; zoomed-page panning; edge and keyboard navigation while marking.
-- Recorded MP3 page-turn sound with persistent mute. Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
+- Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
 - Annotated PDF export with multiply-blended highlights; printable PDF summary of marked pages; native Android share/save sheet.
-- Bundled compatibility-build PDF worker, standard fonts and CMaps; no analytics, account, external fonts or remote audio services.
+- Bundled compatibility-build PDF worker, standard fonts and CMaps; no analytics, account, external fonts or remote services.
 
 The first launch generates a 12-page vector PDF, **The art of paying attention**, locally. The sample book is created locally. Use **+** to import your own PDFs.
 
@@ -77,7 +47,27 @@ The first launch generates a 12-page vector PDF, **The art of paying attention**
 
 Native auto-backup targets the OS Documents directory using scoped storage. It must be opted into and successful writes depend on the Android version and filesystem permissions. Export a manual vault too before clearing app data or uninstalling. Normal compatible signed updates should preserve app data. The old temporary-key previews have a separate migration limitation; **do not uninstall without an external backup and a usable replacement**. See [Android signing](docs/android-signing.md).
 
-## Architecture & performance
+## Updates
+
+Version 1.2.0 uses Android version code **4**. Android updates must retain the application ID (`com.flipvault.pro`) and signing certificate, with a higher version code for each release. The release workflow checks the keystore against a pinned SHA-256 certificate fingerprint and independently verifies the signed APK before publication. Missing signing configuration produces an unsigned verification artifact; invalid configuration blocks publication. The build never generates a replacement release key.
+
+The current release configuration uses GitHub Actions secrets for the private keystore and passwords, plus a repository variable for the public certificate fingerprint. See [Android signing](docs/android-signing.md) for private-key setup, backup, and continuity checks.
+
+A push to `main` runs the full test suite, the browser/offline/large-document suites and the Android build. When a persistent signing key is configured, the workflow also publishes a release containing `FlipVault-Pro-Android.apk`, the web build and the public certificate fingerprint. The release page carries the app description and usage guide from [docs/release-notes.md](docs/release-notes.md), so the download page explains what the app is and how to use it. Without signing configuration the same workflow produces only an unsigned verification artifact and publishes no release.
+
+Legacy debug previews used temporary signing keys that were not retained. They cannot receive an in-place update signed by a new key. Export a vault backup and keep the original PDFs before migrating; a vault does not contain PDF files. The separate **FlipVault Preview** package can be installed without removing the original app, but has independent storage: [Download FlipVault Preview 1.2.0](https://github.com/jojokundesu/pdf-reader/releases/download/side-preview-6bec6cc/FlipVault-Pro-1.2.0-side-by-side-preview.apk) (`com.flipvault.pro.preview`, temporary debug-signed, not the main-app update channel).
+
+## Future updates
+
+- **iPhone / iOS** and **Windows / macOS / Linux** builds are planned; the web app already runs in any modern browser.
+- New signed Android releases will appear automatically on the [releases page](https://github.com/jojokundesu/pdf-reader/releases) and through the download link at the top of this page.
+
+## For developers
+
+- **Browser:** `npm ci && npm run dev`. Open the displayed URL. For an offline/installable production app, run `npm run build && npm run preview`.
+- **Static hosting:** Unzip the web release onto an HTTPS static host. For GitHub Pages, enable **Settings → Pages → Source: GitHub Actions**, then deploy the subpath production build through a Pages workflow. The expected URL is `https://jojokundesu.github.io/pdf-reader/`. Pages must be enabled by a repository administrator. On Android Chrome, a hosted app can also be installed using the browser menu → **Add to home screen → Install**. The APK includes the complete reader and PDF engine, so no hosted website or internet connection is needed for reading.
+
+### Architecture & performance
 
 | Module | Responsibility |
 | --- | --- |
@@ -106,7 +96,7 @@ High-resolution PDF canvases are cached only within `currentPage ± 2`. Individu
 - Encrypted/password-protected PDFs are rejected with an error. OCR, cloud synchronization, and account recovery are not supported.
 - Browser integration is tested in headless Chromium at desktop and 393×830 mobile viewports. Android release builds and instrumentation tests are compiled in CI; unsigned verification artifacts are not installable. Signed publication remains gated on maintainer-configured persistent signing secrets. A synthetic 1,000-page text PDF import/random-navigation smoke test also passes at mobile viewport size; this is not a benchmark of an image-heavy novel. Physical Realme 9i testing has not been performed. Keep Android System WebView updated; the PDF compatibility build includes polyfills for older mobile engines.
 
-## Development
+### Development
 
 Node.js 22+ is recommended.
 
@@ -128,7 +118,7 @@ The integration suite includes actual browser touch-event tests for interior lon
 
 `BASE_PATH=/pdf-reader/ npm run build` creates a GitHub Pages-compatible build. Do not use that subpath build inside the Android shell; Android uses the default `/` base.
 
-## Security & privacy
+### Security & privacy
 
 Backups are validated before writing any restored states, including allowed tools, colors, point coordinates and clip identifiers. PDF buffers are copied before passing to PDF.js workers to avoid detaching persisted binaries. Annotation objects are not sent over the network. Export files may contain sensitive reading notes; keep them in a location you trust. PDFs and vaults are not encrypted at rest by FlipVault. The original reference video is retained in the repository and is not bundled into the application.
 
