@@ -1,5 +1,18 @@
 apply plugin: 'com.android.application'
 
+// Signing identity is injected from protected CI secrets, never generated here.
+def signingEnvironment = [
+    'FLIPVAULT_ANDROID_KEYSTORE_PATH',
+    'FLIPVAULT_ANDROID_STORE_PASSWORD',
+    'FLIPVAULT_ANDROID_KEY_ALIAS',
+    'FLIPVAULT_ANDROID_KEY_PASSWORD'
+]
+def hasReleaseSigning = signingEnvironment.every { System.getenv(it) }
+if (signingEnvironment.any { System.getenv(it) } && !hasReleaseSigning) {
+    throw new GradleException('Incomplete persistent Android release signing configuration. No fallback key is permitted.')
+}
+
+
 android {
     namespace "com.flipvault.pro"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +20,8 @@ android {
         applicationId "com.flipvault.pro"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 3
+        versionName "1.1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +29,20 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            persistentRelease {
+                storeFile file(System.getenv('FLIPVAULT_ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('FLIPVAULT_ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('FLIPVAULT_ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('FLIPVAULT_ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) signingConfig signingConfigs.persistentRelease
+            debuggable false
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

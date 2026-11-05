@@ -3,3 +3,12 @@ dist/
 test-results/
 playwright-report/
 *.zip
+
+# Private Android signing material must never be committed or packaged.
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+!*.example
+FlipVault-Pro-signing-certificate.sha256

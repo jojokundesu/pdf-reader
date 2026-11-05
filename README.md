@@ -13,11 +13,19 @@ A private, touch-first PDF reading room. Real 2D canvas page folds, non-destruct
 
 Select the **hand / Read** tool for anywhere-grab turns. With a marker/eraser selected, a one-finger interior drag still edits ink; use edge gestures, the on-screen arrows or two-finger navigation to turn pages. Above 100% zoom, a one-finger drag pans instead of flipping; return to 100% or use the navigation arrows to turn.
 
-**Updating an older preview:** export a vault backup first and keep your original PDFs. These APKs are debug-signed, and Android can reject an in-place update if the old preview used a different signing key. If you must uninstall it, restore the vault in the new app and re-import your original PDFs to recover matching notes and positions. The new APK's Android version is **1.1.0**, version code **2**.
+## Android update signing correction (1.1.1 build configuration)
+
+You should be able to install updates **without uninstalling**. The earlier CI workflow mistakenly published debug APKs signed with a new temporary key on each runner. It did not retain those private keys. A new key cannot sign a compatible update for an old installation, and the private key cannot be recovered from an APK's public certificate.
+
+The corrected workflow no longer publishes temporary-key/debug APKs. It requires a persistent private keystore in GitHub Actions secrets, pins its signing certificate, and independently verifies the final APK's signer. Without signing configuration it produces an unsigned verification artifact, **not an installable update**, and creates no Android release. Invalid or changed signing configuration blocks publication rather than silently generating another key.
+
+**Setup is still required:** this integration cannot administer Actions secrets. A repository administrator must configure the persistent key and certificate pin in GitHub settings. This code change does **not** recover the original preview key or make old mismatched APKs upgradeable. Keep your existing installation; do not uninstall just to test signing. [Setup, continuity checks and legacy recovery instructions](docs/android-signing.md).
+
+The next build uses Android version **1.1.1**, version code **3**; the package ID remains `com.flipvault.pro`. Existing preview release assets remain available for reference but are not a reliable in-place update channel.
 
 ## Get the app
 
-- **Android:** Download `FlipVault-Pro-Android-preview.apk` from [Releases](https://github.com/jojokundesu/pdf-reader/releases). Android may ask you to allow installation from your browser. This is a sideloadable **debug-signed preview**, not a Play Store release.
+- **Android:** Future installable releases use `FlipVault-Pro-Android.apk`, published only after persistent signing is configured and verified. Older `FlipVault-Pro-Android-preview.apk` assets are legacy debug builds with potentially incompatible signing keys. No new signed APK has been published merely by adding this configuration; see [Android signing](docs/android-signing.md).
 - **Browser:** `npm ci && npm run dev`. Open the displayed URL. For an offline/installable production app, run `npm run build && npm run preview`.
 - **Static hosting:** Unzip the web release onto an HTTPS static host. For GitHub Pages, enable **Settings → Pages → Source: GitHub Actions**, then run **Build, test & publish FlipVault** from this branch in Actions. The expected URL is `https://jojokundesu.github.io/pdf-reader/`. The repository integration cannot enable Pages on your behalf.
 
@@ -47,7 +55,7 @@ The first launch generates a real 12-page vector PDF, **The art of paying attent
 
 **No browser can make data immortal.** Clearing all site data removes IndexedDB and permissions, even with persistent storage. Vaults contain annotations/positions, **not PDF binaries**. Keep your original PDFs, restore a vault from the shield button, and re-import your PDFs. Their hashes reattach the saved notes even if filenames changed. Android app-data deletion/uninstallation has similar consequences; explicitly saved external backups are the recovery mechanism. File handles require relinking after reopening; unsupported browsers use manual downloads rather than claiming silent automatic backups.
 
-Native auto-backup targets the OS Documents directory using scoped storage. It must be opted into and successful writes depend on the Android version and filesystem permissions. Export a manual vault too before clearing app data or uninstalling. Debug-signed APK updates built on another runner may require uninstalling the old preview; **back up first**.
+Native auto-backup targets the OS Documents directory using scoped storage. It must be opted into and successful writes depend on the Android version and filesystem permissions. Export a manual vault too before clearing app data or uninstalling. Normal compatible signed updates should preserve app data. The old temporary-key previews have a separate migration limitation; **do not uninstall without an external backup and a usable replacement**. See [Android signing](docs/android-signing.md).
 
 ## Architecture & performance
 
@@ -75,7 +83,7 @@ High-resolution PDF canvases are cached only within `currentPage ± 2`. Individu
 - ETA is based on elapsed reading time and pages traversed, not an AI estimate or eye tracking.
 - PDF export rasterizes highlight ink and prints paperclip labels using PDF standard text; Unicode labels outside that font are replaced in the export, while their originals remain intact in the vault. Original PDF content remains vector.
 - Encrypted/password-protected PDFs are rejected with an error. No OCR, cloud synchronization, or account recovery is implied.
-- Browser integration is tested in headless Chromium at desktop and 393×830 mobile viewports. Android builds are assembled in CI. A synthetic 1,000-page text PDF import/random-navigation smoke test also passes at mobile viewport size; this is not a benchmark of an image-heavy novel. Physical Realme 9i testing has not been performed. Keep Android System WebView updated; the PDF compatibility build includes polyfills for older mobile engines.
+- Browser integration is tested in headless Chromium at desktop and 393×830 mobile viewports. Android release builds and instrumentation tests are compiled in CI; unsigned verification artifacts are not installable. Signed publication remains gated on maintainer-configured persistent signing secrets. A synthetic 1,000-page text PDF import/random-navigation smoke test also passes at mobile viewport size; this is not a benchmark of an image-heavy novel. Physical Realme 9i testing has not been performed. Keep Android System WebView updated; the PDF compatibility build includes polyfills for older mobile engines.
 
 ## Development
 
@@ -91,7 +99,7 @@ TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
 TEST_URL=http://localhost:4173 npm run test:update
 npm run test:large                   # synthetic 1,000-page import/navigation
 npx cap sync android                # rebuild web assets first
-cd android && ./gradlew assembleDebug
+cd android && ./gradlew :app:assembleRelease  # unsigned unless persistent signing is configured
 ```
 
 The integration suite includes actual browser touch-event tests for interior long-press drags on either half and either spread leaf, RTL, canceled/tiny/vertical gestures, rapid release during preparation, pure-black pixels, all background choices and preference restoration. It also covers import, drawing, PDF-layer integrity, undo/redo, erasing, paperclips, reload restoration, full-text search, backup/download/restore, valid PDF export, mobile corner drag, focus exit, and offline reload. The bundled Chromium test helper extracts its Linux runtime libraries from the npm package, avoiding an extra browser-download dependency. `CHROME_PATH` may specify an installed Chromium.

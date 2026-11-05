@@ -1,4 +1,4 @@
-name: Test web app & build Android APK
+name: Verify app & publish only persistently signed Android releases
 on:
   push:
     branches: [arena/80cef757-pdf-reader, main]
@@ -59,30 +59,64 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx cap sync android
-      - name: Assemble installable Android preview
+      - name: Validate persistent signing identity
+        id: signing
+        env:
+          FLIPVAULT_ANDROID_KEYSTORE_BASE64: ${{ secrets.FLIPVAULT_ANDROID_KEYSTORE_BASE64 }}
+          FLIPVAULT_ANDROID_STORE_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_STORE_PASSWORD }}
+          FLIPVAULT_ANDROID_KEY_ALIAS: ${{ secrets.FLIPVAULT_ANDROID_KEY_ALIAS }}
+          FLIPVAULT_ANDROID_KEY_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_KEY_PASSWORD }}
+          FLIPVAULT_ANDROID_CERT_SHA256: ${{ vars.FLIPVAULT_ANDROID_CERT_SHA256 }}
+        run: node scripts/android-signing.mjs prepare
+      - name: Assemble release and compile instrumentation tests
+        env:
+          FLIPVAULT_ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+          FLIPVAULT_ANDROID_STORE_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_STORE_PASSWORD }}
+          FLIPVAULT_ANDROID_KEY_ALIAS: ${{ secrets.FLIPVAULT_ANDROID_KEY_ALIAS }}
+          FLIPVAULT_ANDROID_KEY_PASSWORD: ${{ secrets.FLIPVAULT_ANDROID_KEY_PASSWORD }}
         working-directory: android
         run: |
           chmod +x gradlew
           set +e
-          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon > gradle.log 2>&1
+          ./gradlew :app:assembleRelease :app:assembleDebugAndroidTest --no-daemon > gradle.log 2>&1
           RESULT=$?
           tail -150 gradle.log
           if [ "$RESULT" -ne 0 ]; then
             node -e "let s=require('fs').readFileSync('gradle.log','utf8').slice(-3500);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
             exit "$RESULT"
           fi
-      - uses: actions/upload-artifact@v4
+      - name: Independently verify APK signing certificate
+        if: steps.signing.outputs.configured == 'true'
+        env:
+          FLIPVAULT_ANDROID_CERT_SHA256: ${{ vars.FLIPVAULT_ANDROID_CERT_SHA256 }}
+        run: node scripts/android-signing.mjs verify-apk android/app/build/outputs/apk/release/app-release.apk
+      - name: Upload signed Android artifact
+        if: steps.signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          name: FlipVault-Pro-Android
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Publish downloadable preview
+          name: FlipVault-Pro-Android-signed
+          path: android/app/build/outputs/apk/release/app-release.apk
+      - name: Upload unsigned verification artifact (not installable)
+        if: steps.signing.outputs.configured != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlipVault-Pro-Android-UNSIGNED-NOT-INSTALLABLE
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Publish verified signed release
+        if: steps.signing.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk FlipVault-Pro-Android-preview.apk
+          cp android/app/build/outputs/apk/release/app-release.apk FlipVault-Pro-Android.apk
           (cd dist && zip -q -r ../FlipVault-Pro-web.zip .)
-          TAG="preview-${GITHUB_SHA:0:7}"
+          TAG="signed-${GITHUB_SHA:0:7}"
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
           gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
-            --title "FlipVault Pro 1.1.0 · Anywhere-drag & pure-black preview" \
-            --notes "Version 1.1.0: grab and drag from anywhere in Read mode; pure-black default background plus independent saved background choices; touch and memory refinements. Install FlipVault-Pro-Android-preview.apk on Android, or host the web ZIP on HTTPS. The APK is a debug-signed sideload preview, not a Play Store release. Browser integration and offline tests passed; physical Realme 9i testing is still needed. Back up your vault before uninstalling or replacing an earlier preview. See README for features, backup/recovery instructions and known limitations." \
-            FlipVault-Pro-Android-preview.apk FlipVault-Pro-web.zip
+            --title "FlipVault Pro $VERSION · Persistently signed Android build" \
+            --notes "APK signed with the configured persistent key and independently checked against the pinned SHA-256 signing certificate. In-place upgrades require that your installed app has this same signing identity and a lower version code. Legacy temporary-key debug APKs cannot be converted into compatible updates without their original private key. No device-level upgrade test has been performed by this workflow. See docs/android-signing.md and README for setup, backup and legacy migration instructions." \
+            FlipVault-Pro-Android.apk FlipVault-Pro-web.zip FlipVault-Pro-signing-certificate.sha256
+      - name: Remove temporary private signing material
+        if: always() && steps.signing.outputs.keystore_path != ''
+        env:
+          KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+        run: rm -f -- "$KEYSTORE_PATH"
