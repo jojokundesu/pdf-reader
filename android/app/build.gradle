@@ -7,6 +7,8 @@ def signingEnvironment = [
     'FLIPVAULT_ANDROID_KEY_ALIAS',
     'FLIPVAULT_ANDROID_KEY_PASSWORD'
 ]
+def sideBySidePreview = project.findProperty('flipvaultSideBySidePreview') == 'true'
+
 def hasReleaseSigning = signingEnvironment.every { System.getenv(it) }
 if (signingEnvironment.any { System.getenv(it) } && !hasReleaseSigning) {
     throw new GradleException('Incomplete persistent Android release signing configuration. No fallback key is permitted.')
@@ -17,7 +19,8 @@ android {
     namespace "com.flipvault.pro"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.flipvault.pro"
+        applicationId sideBySidePreview ? "com.flipvault.pro.preview" : "com.flipvault.pro"
+        manifestPlaceholders = [flipvaultAppLabel: sideBySidePreview ? 'FlipVault Preview' : 'FlipVault Pro']
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 4

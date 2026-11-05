@@ -1,0 +1,65 @@
+name: Explicit side-by-side Android preview download
+on:
+  push:
+    branches: [arena/80cef757-pdf-reader]
+    paths: [.github/workflows/side-by-side-preview.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Use Android SDK
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Assemble explicitly separate preview app
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set +e
+          ./gradlew :app:assembleDebug -PflipvaultSideBySidePreview=true --no-daemon > preview-build.log 2>&1
+          RESULT=$?
+          tail -100 preview-build.log
+          if [ "$RESULT" -ne 0 ]; then
+            node -e "let s=require('fs').readFileSync('preview-build.log','utf8').slice(-3500);console.log('::error::'+s.replace(/%/g,'%25').replace(/\n/g,'%0A').replace(/\r/g,'%0D'))"
+            exit "$RESULT"
+          fi
+      - name: Verify this APK cannot replace the user's existing main app
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" > preview-badging.txt
+          grep -q "package: name='com.flipvault.pro.preview'" preview-badging.txt
+          grep -q "application-label:'FlipVault Preview'" preview-badging.txt
+          python - <<'PY'
+          import zipfile, hashlib
+          with zipfile.ZipFile('android/app/build/outputs/apk/debug/app-debug.apk') as apk:
+              sound = [n for n in apk.namelist() if n.startswith('assets/public/assets/page-turn-') and n.endswith('.mp3')]
+              assert len(sound) == 1
+              assert hashlib.sha256(apk.read(sound[0])).hexdigest() == '543118ab2c6c9268b0ab0070ebdb1ec29d5cabd12bceeee67af184ccb3c39c51'
+          PY
+      - name: Publish requested preview download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk FlipVault-Pro-1.2.0-side-by-side-preview.apk
+          (cd dist && zip -q -r ../FlipVault-Pro-1.2.0-web.zip .)
+          gh release create "side-preview-${GITHUB_SHA:0:7}" --target "$GITHUB_SHA" --prerelease \
+            --title "FlipVault Pro 1.2.0 · Separate preview with recorded page sound" \
+            --notes "Explicitly requested temporary preview. Installs as FlipVault Preview (com.flipvault.pro.preview), alongside the existing FlipVault Pro app. Includes the exact user-supplied page-turn recording, pure-black background and anywhere-drag turns. It does not replace the old app or automatically share its books/notes: import a vault backup and original PDFs if needed. This APK uses a temporary debug key and is NOT a permanent in-place update channel. Main-app signed release safeguards remain unchanged. See docs/android-signing.md for permanent signing setup. Physical-device playback/install testing remains outstanding." \
+            FlipVault-Pro-1.2.0-side-by-side-preview.apk FlipVault-Pro-1.2.0-web.zip
