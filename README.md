@@ -37,6 +37,10 @@ The current release configuration uses GitHub Actions secrets for the private ke
 
 Legacy debug previews used temporary signing keys that were not retained. They cannot receive an in-place update signed by a new key. Export a vault backup and keep the original PDFs before migrating; a vault does not contain PDF files. The separate **FlipVault Preview** package can be installed without removing the original app, but has independent storage.
 
+### How a release is published
+
+A push to `main` runs the full test suite, the browser/offline/large-document suites and the Android build. When a persistent signing key is configured, the workflow also publishes a release containing `FlipVault-Pro-Android.apk`, the web build and the public certificate fingerprint. The release page carries the app description and usage guide from [docs/release-notes.md](docs/release-notes.md), so the download page explains what the app is and how to use it. Without signing configuration the same workflow produces only an unsigned verification artifact and publishes no release.
+
 ## Get the app
 
 - **Android preview:** [Download FlipVault Preview 1.2.0](https://github.com/jojokundesu/pdf-reader/releases/download/side-preview-6bec6cc/FlipVault-Pro-1.2.0-side-by-side-preview.apk). Package `com.flipvault.pro.preview` installs alongside FlipVault Pro with separate books and notes. This temporary debug-signed build is not the main-app update channel.

@@ -111,9 +111,24 @@ jobs:
           (cd dist && zip -q -r ../FlipVault-Pro-web.zip .)
           TAG="signed-${GITHUB_SHA:0:7}"
           VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
+          {
+            sed -e "s/{{VERSION}}/$VERSION/g" -e "s/{{BRANCH}}/${GITHUB_REF_NAME}/g" docs/release-notes.md
+            cat <<'NOTES'
+
+          ---
+
+          ## Signing and updates
+
+          This APK was signed with the configured persistent key and independently checked against the pinned
+          SHA-256 signing certificate before publication. In-place upgrades require that the installed app has
+          this same signing identity and a lower version code. Legacy temporary-key debug previews cannot be
+          converted into compatible updates without their original private key; export a vault backup and keep the
+          original PDFs before migrating. This workflow performs no device-level install or upgrade test.
+          NOTES
+          } > "$RUNNER_TEMP/release-notes.md"
           gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
             --title "FlipVault Pro $VERSION · Persistently signed Android build" \
-            --notes "APK signed with the configured persistent key and independently checked against the pinned SHA-256 signing certificate. In-place upgrades require that your installed app has this same signing identity and a lower version code. Legacy temporary-key debug APKs cannot be converted into compatible updates without their original private key. No device-level upgrade test has been performed by this workflow. See docs/android-signing.md and README for setup, backup and legacy migration instructions." \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             FlipVault-Pro-Android.apk FlipVault-Pro-web.zip FlipVault-Pro-signing-certificate.sha256
       - name: Remove temporary private signing material
         if: always() && steps.signing.outputs.keystore_path != ''
