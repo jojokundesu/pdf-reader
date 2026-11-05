@@ -1,10 +1,10 @@
 # FlipVault Pro
 
-A private, touch-first PDF reading room. Real 2D canvas page folds, non-destructive highlights, tactile paperclips, and a library that stays on your device.
+An offline PDF reader for Android and the web, with canvas page folds, non-destructive highlights, paperclip bookmarks, and an on-device library.
 
-## Recorded page audio (1.2.0)
+## Page-turn audio
 
-The previous generated-noise sound has been replaced with the exact MP3 decoded from the user's uploaded Base64 file. The original recording is bundled locally (83,591 bytes), not fetched from an external audio service and not re-encoded. Its hash and provenance are recorded in [`src/assets/README.md`](src/assets/README.md).
+Page turns use a bundled MP3 recording (83,591 bytes). The recording plays locally without re-encoding or a network request. Its checksum and source details are listed in [`src/assets/README.md`](src/assets/README.md).
 
 - The bytes preload without playing; one low-latency AudioContext unlocks on an actual pointer/key gesture and decodes the recording once for reuse.
 - The clip has a very quiet lead-in. Playback skips quiet padding, retains the paper sound and a short natural tail, and uses bounded level adjustment and edge fades. Pitch and playback speed remain unchanged.
@@ -16,9 +16,9 @@ The previous generated-noise sound has been replaced with the exact MP3 decoded 
 
 `npm run test:audio` exercises real browser MP3 decoding, trusted-gesture startup, page/keyboard/jump playback, silent canceled turns, persistent mute, background handling and offline playback. Unit tests additionally cover overlapping voices, gain/trim analysis, retry failures and stale/pending requests. Browser tests inspect actual Web Audio scheduling; they are not a physical-device listening test.
 
-Version 1.2.0 uses Android version code **4**. Android APK publication remains gated by the persistent-signing setup below; adding this sound does not bypass that gate or publish another temporary-key APK.
+Version 1.2.0 uses Android version code **4**. Main-app APK releases require a configured, verified signing identity; the separate preview uses its own package ID.
 
-## What changed in 1.1.0
+## Page gestures & appearance
 
 - **Grab anywhere in Read mode:** tap/hold the middle, upper or lower area of a page, then drag horizontally. Drag left for next and right for previous; Manga mode reverses this. The direction follows your movement, not which half you touched. Both leaves of a desktop spread accept the gesture.
 - **No accidental flips:** a stationary hold and a vertical movement do nothing. Tiny interior drags spring back. A deliberate drag of roughly 22% of the displayed page width, or a short brisk flick, completes the turn. Corner/edge peels still use their original fold-progress threshold.
@@ -29,23 +29,21 @@ Version 1.2.0 uses Android version code **4**. Android APK publication remains g
 
 Select the **hand / Read** tool for anywhere-grab turns. With a marker/eraser selected, a one-finger interior drag still edits ink; use edge gestures, the on-screen arrows or two-finger navigation to turn pages. Above 100% zoom, a one-finger drag pans instead of flipping; return to 100% or use the navigation arrows to turn.
 
-## Android update signing correction (1.1.1 build configuration)
+## Android updates
 
-You should be able to install updates **without uninstalling**. The earlier CI workflow mistakenly published debug APKs signed with a new temporary key on each runner. It did not retain those private keys. A new key cannot sign a compatible update for an old installation, and the private key cannot be recovered from an APK's public certificate.
+Android updates must retain the application ID (`com.flipvault.pro`) and signing certificate, with a higher version code for each release. The release workflow checks the keystore against a pinned SHA-256 certificate fingerprint and independently verifies the signed APK before publication. Missing signing configuration produces an unsigned verification artifact; invalid configuration blocks publication. The build never generates a replacement release key.
 
-The main release workflow no longer publishes temporary-key/debug APKs. A separately named, explicitly requested side-by-side preview may still be published with a different application ID; it cannot replace the main app. It requires a persistent private keystore in GitHub Actions secrets, pins its signing certificate, and independently verifies the final APK's signer. Without signing configuration it produces an unsigned verification artifact, **not an installable update**, and creates no Android release. Invalid or changed signing configuration blocks publication rather than silently generating another key.
+The current release configuration uses GitHub Actions secrets for the private keystore and passwords, plus a repository variable for the public certificate fingerprint. Android itself does not require GitHub secrets: a persistent keystore can be supplied from any storage location. Committing a signing key publicly also makes it reusable, but allows anyone to sign APKs with the same identity. See [Android signing](docs/android-signing.md) for private-key setup, backup, and continuity checks.
 
-**Setup is still required:** this integration cannot administer Actions secrets. A repository administrator must configure the persistent key and certificate pin in GitHub settings. A maintainer-run helper and phone-compatible Codespaces steps are available in [the signing guide](docs/android-signing.md#fastest-setup-from-an-android-phone-no-pc-required). This code change does **not** recover the original preview key or make old mismatched APKs upgradeable. Keep your existing installation; do not uninstall just to test signing. [Setup, continuity checks and legacy recovery instructions](docs/android-signing.md).
-
-The signing correction introduced Android version **1.1.1**, version code **3**; the current audio update is **1.2.0**, version code **4**; the package ID remains `com.flipvault.pro`. Existing preview release assets remain available for reference but are not a reliable in-place update channel.
+Legacy debug previews used temporary signing keys that were not retained. They cannot receive an in-place update signed by a new key. Export a vault backup and keep the original PDFs before migrating; a vault does not contain PDF files. The separate **FlipVault Preview** package can be installed without removing the original app, but has independent storage.
 
 ## Get the app
 
-- **Requested latest side-by-side preview:** the dedicated preview release installs as **FlipVault Preview**, package `com.flipvault.pro.preview`, with the new recorded audio. It leaves the old FlipVault Pro app installed and does not automatically inherit its books/notes. Import a vault backup and original PDFs if desired. This is an explicitly temporary debug preview, not a compatible main-app update channel.
+- **Android preview:** [Download FlipVault Preview 1.2.0](https://github.com/jojokundesu/pdf-reader/releases/download/side-preview-6bec6cc/FlipVault-Pro-1.2.0-side-by-side-preview.apk). Package `com.flipvault.pro.preview` installs alongside FlipVault Pro with separate books and notes. This temporary debug-signed build is not the main-app update channel.
 
 - **Android:** Future installable releases use `FlipVault-Pro-Android.apk`, published only after persistent signing is configured and verified. Older `FlipVault-Pro-Android-preview.apk` assets are legacy debug builds with potentially incompatible signing keys. Main-app signed releases still require setup; see [Android signing](docs/android-signing.md).
 - **Browser:** `npm ci && npm run dev`. Open the displayed URL. For an offline/installable production app, run `npm run build && npm run preview`.
-- **Static hosting:** Unzip the web release onto an HTTPS static host. For GitHub Pages, enable **Settings → Pages → Source: GitHub Actions**, then run **Build, test & publish FlipVault** from this branch in Actions. The expected URL is `https://jojokundesu.github.io/pdf-reader/`. The repository integration cannot enable Pages on your behalf.
+- **Static hosting:** Unzip the web release onto an HTTPS static host. For GitHub Pages, enable **Settings → Pages → Source: GitHub Actions**, then deploy the subpath production build through a Pages workflow. The expected URL is `https://jojokundesu.github.io/pdf-reader/`. Pages must be enabled by a repository administrator.
 
 On Android Chrome, a hosted app can also be installed using the browser menu → **Add to home screen → Install**. The APK includes the complete reader and PDF engine, so no hosted website or internet connection is needed for reading.
 
@@ -59,11 +57,11 @@ On Android Chrome, a hosted app can also be installed using the browser menu →
 - Six paperclip finishes, top/right/bottom placement, draggable edge positions, editable notes, full-book bookmark tabs and a notes drawer.
 - PDF.js full-text search with snippets and a destination-page pulse; lazy WebP thumbnail filmstrip with annotation/bookmark indicators.
 - Original, sepia, AMOLED and e-ink themes; auto/single/spread layouts; RTL controls; 1–4× pinch/wheel/double-click zoom; zoomed-page panning; edge and keyboard navigation while marking.
-- User-provided recorded MP3 page-turn sound with persistent mute. Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
+- Recorded MP3 page-turn sound with persistent mute. Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
 - Annotated PDF export with multiply-blended highlights; printable PDF summary of marked pages; native Android share/save sheet.
-- Bundled compatibility-build PDF worker, standard fonts and CMaps; no analytics, account, external font, audio or AI service.
+- Bundled compatibility-build PDF worker, standard fonts and CMaps; no analytics, account, external fonts or remote audio services.
 
-The first launch generates a real 12-page vector PDF, **The art of paying attention**, locally. It is a usable sample book, not a remote dependency. Use **+** to import your own PDFs.
+The first launch generates a 12-page vector PDF, **The art of paying attention**, locally. The sample book is created locally. Use **+** to import your own PDFs.
 
 ## Keep your notes safe
 
@@ -71,7 +69,7 @@ The first launch generates a real 12-page vector PDF, **The art of paying attent
 2. **External vault:** Download a `.flipvault.json` backup from the shield button. Desktop browsers supporting the File System Access API can link a `.flipvault` file for automatic metadata syncing, or reopen an existing file to restore and relink. **Android APK:** enable Android auto-backup to write `Documents/FlipVault/Auto-backup.flipvault.json` on every saved change. Native PDF/backup exports use the Android share sheet; choose Files/Drive or another destination.
 3. **Portable study copies:** Export an annotated PDF or a printable study summary.
 
-**No browser can make data immortal.** Clearing all site data removes IndexedDB and permissions, even with persistent storage. Vaults contain annotations/positions, **not PDF binaries**. Keep your original PDFs, restore a vault from the shield button, and re-import your PDFs. Their hashes reattach the saved notes even if filenames changed. Android app-data deletion/uninstallation has similar consequences; explicitly saved external backups are the recovery mechanism. File handles require relinking after reopening; unsupported browsers use manual downloads rather than claiming silent automatic backups.
+**Storage and recovery:** Clearing all site data removes IndexedDB and permissions, even with persistent storage. Vaults contain annotations/positions, **not PDF binaries**. Keep your original PDFs, restore a vault from the shield button, and re-import your PDFs. Their hashes reattach the saved notes even if filenames changed. Android app-data deletion/uninstallation has similar consequences; explicitly saved external backups are the recovery mechanism. File handles require relinking after reopening; unsupported browsers use manual downloads instead of automatic file syncing.
 
 Native auto-backup targets the OS Documents directory using scoped storage. It must be opted into and successful writes depend on the Android version and filesystem permissions. Export a manual vault too before clearing app data or uninstalling. Normal compatible signed updates should preserve app data. The old temporary-key previews have a separate migration limitation; **do not uninstall without an external backup and a usable replacement**. See [Android signing](docs/android-signing.md).
 
@@ -90,7 +88,7 @@ Native auto-backup targets the OS Documents directory using scoped storage. It m
 | `vite.config.js` | Split bundles, bundled PDF resources, versioned offline precache |
 | `android/` | Capacitor Android shell and native filesystem/share integration |
 
-High-resolution PDF canvases are cached only within `currentPage ± 2`. Individual page renders are capped at 4.5 million pixels, at most 2× device-pixel ratio, and 3× rerender scale; CSS allows 4× viewing. This intentionally favors memory safety over unlimited raster resolution on midrange Android hardware. Thumbnails are rendered only when intersecting the filmstrip viewport. No mobile 60 FPS guarantee is claimed without testing the actual PDF and device.
+High-resolution PDF canvases are cached only within `currentPage ± 2`. Individual page renders are capped at 4.5 million pixels, at most 2× device-pixel ratio, and 3× rerender scale; CSS allows 4× viewing. This intentionally favors memory safety over unlimited raster resolution on midrange Android hardware. Thumbnails are rendered only when intersecting the filmstrip viewport. Frame rate depends on the device and PDF.
 
 ### Practical scope notes
 
@@ -99,9 +97,9 @@ High-resolution PDF canvases are cached only within `currentPage ± 2`. Individu
 - Spread mode shows the preceding page beside the active page. Tap the left leaf to make it active for annotation. The cover is single-page. Turns advance the active page one at a time.
 - Search pulses the destination page rather than aligning individual word overlays on scanned/rotated text. Image-only scans need OCR outside this app.
 - Undo/redo histories are per page during the running session; resulting ink persists across restarts. The app does not retain undo history after it closes.
-- ETA is based on elapsed reading time and pages traversed, not an AI estimate or eye tracking.
+- ETA is based on elapsed reading time and pages traversed, not document analysis or eye tracking.
 - PDF export rasterizes highlight ink and prints paperclip labels using PDF standard text; Unicode labels outside that font are replaced in the export, while their originals remain intact in the vault. Original PDF content remains vector.
-- Encrypted/password-protected PDFs are rejected with an error. No OCR, cloud synchronization, or account recovery is implied.
+- Encrypted/password-protected PDFs are rejected with an error. OCR, cloud synchronization, and account recovery are not supported.
 - Browser integration is tested in headless Chromium at desktop and 393×830 mobile viewports. Android release builds and instrumentation tests are compiled in CI; unsigned verification artifacts are not installable. Signed publication remains gated on maintainer-configured persistent signing secrets. A synthetic 1,000-page text PDF import/random-navigation smoke test also passes at mobile viewport size; this is not a benchmark of an image-heavy novel. Physical Realme 9i testing has not been performed. Keep Android System WebView updated; the PDF compatibility build includes polyfills for older mobile engines.
 
 ## Development
@@ -110,7 +108,7 @@ Node.js 22+ is recommended.
 
 ```sh
 npm ci
-npm run dev                         # binds 0.0.0.0, permits Arena preview hosts
+npm run dev                         # binds 0.0.0.0 for network access
 npm test                            # geometry + storage + hostile-backup validation
 npm run build                       # production bundle and offline shell
 npm run preview -- --port 4173
