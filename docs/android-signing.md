@@ -6,7 +6,7 @@ The original workflow published `assembleDebug` output. Each fresh GitHub-hosted
 
 That was a build/release configuration error, not something a reader should need to work around for every update.
 
-Android accepts an in-place update when the package ID and signing identity are compatible and the version code is not a downgrade. FlipVault keeps `com.flipvault.pro`, and the next build uses version code **3** / version name **1.1.1**. Future releases must increase the version code as well as preserve the signing identity.
+Android accepts an in-place update when the package ID and signing identity are compatible and the version code is not a downgrade. FlipVault keeps `com.flipvault.pro`, and the signing correction reserved version code **3** / version name **1.1.1**. The recorded-audio update now uses version code **4** / version name **1.2.0**. Future releases must increase the version code as well as preserve the signing identity.
 
 An APK contains the **public certificate**, not the private signing key. Downloading or extracting the certificate from an old APK cannot recover the key. Android signing-key rotation also needs authorization from the old key; it does not bypass this requirement.
 

@@ -1,3 +1,5 @@
+import { PageTurnAudio } from "./page-audio";
+import pageTurnSoundUrl from "./assets/page-turn.mp3?url";
 import { horizontalIntent, interiorFoldPoint, completeTurn } from "./gestures";
 import "./style.css";
 import {
@@ -497,8 +499,10 @@ async function go(n, animate = false) {
     await turn(n > page ? 1 : -1);
     return;
   }
+  const activePdf = pdf;
   page = n;
   await render();
+  if (pdf === activePdf && page === n) pageAudio.play();
   $("#filmstrip .selected")?.scrollIntoView({
     block: "nearest",
     inline: "center",
@@ -514,7 +518,7 @@ async function turn(dir) {
     curl.begin(current, next, current.height * 0.88, rtl ? dir > 0 : dir < 0);
     curl.p = { x: current.width * 0.8, y: current.height * 0.86 };
     curl.draw();
-    sound(0.7);
+    pageAudio.play();
     curl.release(true, () => {
       page += dir;
       render()
@@ -639,37 +643,34 @@ function updateFilmMarkers() {
         : "";
   });
 }
-function sound(speed = 1) {
-  if (muted) return;
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    sound.ctx ||= new AC();
-    const ctx = sound.ctx;
-    if (ctx.state === "suspended") ctx.resume();
-    const duration = 0.28 + Math.min(1, speed) * 0.18,
-      buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate),
-      data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    const source = ctx.createBufferSource(),
-      filter = ctx.createBiquadFilter(),
-      gain = ctx.createGain();
-    source.buffer = buffer;
-    filter.type = "bandpass";
-    filter.frequency.setValueAtTime(500 + speed * 500, ctx.currentTime);
-    filter.frequency.exponentialRampToValueAtTime(
-      180,
-      ctx.currentTime + duration,
+const pageAudio = new PageTurnAudio({
+  url: pageTurnSoundUrl,
+  onError: () => {
+    toast(
+      "Page audio is unavailable. Tap the speaker to retry; reading still works.",
     );
-    filter.Q.value = 0.65;
-    gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    source.connect(filter).connect(gain).connect(ctx.destination);
-    source.start();
-    source.stop(ctx.currentTime + duration);
-  } catch {}
+  },
+});
+pageAudio.preload();
+function updateSoundButton() {
+  const button = $("#sound"),
+    label = muted
+      ? "Unmute recorded page-turn sound"
+      : "Mute recorded page-turn sound";
+  button.innerHTML = icon(muted ? "volume-x" : "volume-2");
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.setAttribute("aria-pressed", String(muted));
+  refreshIcons();
 }
+function unlockPageAudio(e) {
+  if (e.isTrusted) pageAudio.unlock();
+}
+document.addEventListener("pointerdown", unlockPageAudio, {
+  capture: true,
+  passive: true,
+});
+document.addEventListener("keydown", unlockPageAudio, { capture: true });
 function setTool(t) {
   tool = t;
   ["hand", "marker", "eraser"].forEach((id) =>
@@ -1314,7 +1315,6 @@ function updateReadingStats() {
   if (focusEnd && Date.now() >= focusEnd) {
     focusEnd = 0;
     toast("A lovely little reading session. Time to rest your eyes.");
-    sound(0.3);
   }
 }
 function showMore() {
@@ -1629,7 +1629,7 @@ async function pointerEnd(e, cancel = false) {
       pageWidth: $("#rightPage").getBoundingClientRect().width,
     });
     turning = true;
-    if (complete) sound(Math.abs(vx));
+    if (complete) pageAudio.play();
     curl.release(complete, (done) => {
       if (done) page += g.dir;
       render()
@@ -1720,11 +1720,13 @@ on("last", () => go(pdf.numPages));
 on("zoomIn", () => setZoom(zoom + 0.25));
 on("zoomOut", () => setZoom(zoom - 0.25));
 on("zoomValue", () => setZoom(1));
-on("sound", () => {
+on("sound", async () => {
   muted = !muted;
-  $("#sound").innerHTML = icon(muted ? "volume-x" : "volume-2");
-  refreshIcons();
-  toast(muted ? "Page sounds off." : "Page sounds on.");
+  pageAudio.setMuted(muted);
+  updateSoundButton();
+  if (!muted) pageAudio.unlock();
+  await store.put("settings", muted, "pageSoundMuted");
+  toast(muted ? "Page sounds off." : "Recorded page sounds on.");
 });
 on("focus", () => {
   document.body.classList.toggle("focus-mode");
@@ -1815,6 +1817,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
   installEvent = e;
 });
 document.addEventListener("visibilitychange", () => {
+  pageAudio.setBackgrounded(document.hidden);
   if (document.hidden) {
     clearTimeout(saveTimer);
     save().catch(fail);
@@ -1823,7 +1826,10 @@ document.addEventListener("visibilitychange", () => {
     baseSeconds = state.totalReadingTimeSeconds || 0;
   }
 });
-window.addEventListener("pagehide", () => save().catch(() => {}));
+window.addEventListener("pagehide", () => {
+  pageAudio.stop();
+  save().catch(() => {});
+});
 setInterval(() => {
   if (ready && !document.hidden) {
     updateReadingStats();
@@ -1845,6 +1851,10 @@ window.addEventListener(
 );
 async function init() {
   await store.openDB();
+  muted = !!(await store.get("settings", "pageSoundMuted"));
+  pageAudio.setMuted(muted);
+  pageAudio.setBackgrounded(document.hidden);
+  updateSoundButton();
   const savedBackground = await store.get("settings", "readerBackground");
   background = ["black", "charcoal", "forest", "parchment"].includes(
     savedBackground,

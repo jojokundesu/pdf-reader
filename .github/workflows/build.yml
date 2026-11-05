@@ -25,7 +25,7 @@ jobs:
           npx wait-on --timeout 30000 http-get://localhost:4173
           set +e
           export TEST_URL=http://localhost:4173 TEST_OFFLINE=1
-          (npm run test:e2e && npm run test:update && npm run test:large) > e2e.log 2>&1
+          (npm run test:e2e && npm run test:update && npm run test:audio && npm run test:large) > e2e.log 2>&1
           RESULT=$?
           cat e2e.log
           if [ "$RESULT" -ne 0 ]; then

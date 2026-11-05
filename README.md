@@ -2,6 +2,22 @@
 
 A private, touch-first PDF reading room. Real 2D canvas page folds, non-destructive highlights, tactile paperclips, and a library that stays on your device.
 
+## Recorded page audio (1.2.0)
+
+The previous generated-noise sound has been replaced with the exact MP3 decoded from the user's uploaded Base64 file. The original recording is bundled locally (83,591 bytes), not fetched from an external audio service and not re-encoded. Its hash and provenance are recorded in [`src/assets/README.md`](src/assets/README.md).
+
+- The bytes preload without playing; one low-latency AudioContext unlocks on an actual pointer/key gesture and decodes the recording once for reuse.
+- The clip has a very quiet lead-in. Playback skips quiet padding, retains the paper sound and a short natural tail, and uses bounded level adjustment and edge fades. Pitch and playback speed remain unchanged.
+- A committed curl, next/previous navigation, or a direct page jump plays one recording. A canceled peel, spring-back, stationary hold, initial book load, or focus-timer toast does not.
+- Quick turns fade the previous tail instead of piling up recordings. Delayed decoding does not queue stale sounds or block page animations.
+- The speaker button stops current playback when muted and saves the mute preference across books/restarts. Backgrounding stops playback; returning does not replay it.
+- The production service worker precaches the hashed MP3; the Capacitor app packages it with the reader. No internet connection is needed after the web app has cached its assets, or for the bundled native reader.
+- If loading, decoding or browser audio permission fails, reading still works; the next speaker/user gesture can retry. A slow first-ever load can skip that turn's sound rather than play it late.
+
+`npm run test:audio` exercises real browser MP3 decoding, trusted-gesture startup, page/keyboard/jump playback, silent canceled turns, persistent mute, background handling and offline playback. Unit tests additionally cover overlapping voices, gain/trim analysis, retry failures and stale/pending requests. Browser tests inspect actual Web Audio scheduling; they are not a physical-device listening test.
+
+Version 1.2.0 uses Android version code **4**. Android APK publication remains gated by the persistent-signing setup below; adding this sound does not bypass that gate or publish another temporary-key APK.
+
 ## What changed in 1.1.0
 
 - **Grab anywhere in Read mode:** tap/hold the middle, upper or lower area of a page, then drag horizontally. Drag left for next and right for previous; Manga mode reverses this. The direction follows your movement, not which half you touched. Both leaves of a desktop spread accept the gesture.
@@ -21,7 +37,7 @@ The corrected workflow no longer publishes temporary-key/debug APKs. It requires
 
 **Setup is still required:** this integration cannot administer Actions secrets. A repository administrator must configure the persistent key and certificate pin in GitHub settings. This code change does **not** recover the original preview key or make old mismatched APKs upgradeable. Keep your existing installation; do not uninstall just to test signing. [Setup, continuity checks and legacy recovery instructions](docs/android-signing.md).
 
-The next build uses Android version **1.1.1**, version code **3**; the package ID remains `com.flipvault.pro`. Existing preview release assets remain available for reference but are not a reliable in-place update channel.
+The signing correction introduced Android version **1.1.1**, version code **3**; the current audio update is **1.2.0**, version code **4**; the package ID remains `com.flipvault.pro`. Existing preview release assets remain available for reference but are not a reliable in-place update channel.
 
 ## Get the app
 
@@ -41,7 +57,7 @@ On Android Chrome, a hosted app can also be installed using the browser menu →
 - Six paperclip finishes, top/right/bottom placement, draggable edge positions, editable notes, full-book bookmark tabs and a notes drawer.
 - PDF.js full-text search with snippets and a destination-page pulse; lazy WebP thumbnail filmstrip with annotation/bookmark indicators.
 - Original, sepia, AMOLED and e-ink themes; auto/single/spread layouts; RTL controls; 1–4× pinch/wheel/double-click zoom; zoomed-page panning; edge and keyboard navigation while marking.
-- Procedural Web Audio page sounds with mute. Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
+- User-provided recorded MP3 page-turn sound with persistent mute. Quiet focus mode with idle HUD hiding, accessible exit, reading-time/remaining-time estimates, a 20-minute reading ritual, and independently navigable floating reference view.
 - Annotated PDF export with multiply-blended highlights; printable PDF summary of marked pages; native Android share/save sheet.
 - Bundled compatibility-build PDF worker, standard fonts and CMaps; no analytics, account, external font, audio or AI service.
 
@@ -64,6 +80,7 @@ Native auto-backup targets the OS Documents directory using scoped storage. It m
 | `src/geometry.js` | Half-plane clipping, reflection matrix, spine clamping |
 | `src/gestures.js` | Horizontal intent, displacement-based interior grabs, swipe completion rules |
 | `src/curl.js` | Canvas fold pipeline and spring animation |
+| `src/page-audio.js` | Bundled MP3 playback, gesture unlocking, single-buffer reuse, fades and mute lifecycle |
 | `src/annotations.js` | Vector strokes, isolated buffers, dual erasure and history |
 | `src/storage.js` | IndexedDB, sampled SHA-256 fingerprints, validated sidecars, native export |
 | `src/main.js` | PDF virtualization, gestures, reader UI, search, backup and export |
@@ -97,6 +114,7 @@ npm run build                       # production bundle and offline shell
 npm run preview -- --port 4173
 TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
 TEST_URL=http://localhost:4173 npm run test:update
+TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:audio
 npm run test:large                   # synthetic 1,000-page import/navigation
 npx cap sync android                # rebuild web assets first
 cd android && ./gradlew :app:assembleRelease  # unsigned unless persistent signing is configured

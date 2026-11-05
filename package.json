@@ -1,6 +1,6 @@
 {
   "name": "flipvault-pro",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "android:sync": "npm run build && cap sync android",
     "format": "prettier --write src tests vite.config.js",
     "test:large": "node tests/large-pdf.mjs",
-    "test:update": "node tests/reader-update.mjs"
+    "test:update": "node tests/reader-update.mjs",
+    "test:audio": "node tests/page-audio.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.10",
