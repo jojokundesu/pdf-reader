@@ -5,9 +5,12 @@ export class PageCurl {
     this.ctx = canvas.getContext("2d");
     this.running = false;
     this.frame = 0;
+    this.drawFrame = 0;
   }
   begin(current, next, anchorY, reverse = false) {
     cancelAnimationFrame(this.frame);
+    cancelAnimationFrame(this.drawFrame);
+    this.drawFrame = 0;
     this.current = current;
     this.next = next;
     this.w = current.width;
@@ -23,7 +26,22 @@ export class PageCurl {
   }
   move(p) {
     this.p = clampPoint(p, this.w, this.h, this.c.y);
-    this.draw();
+    if (!this.drawFrame)
+      this.drawFrame = requestAnimationFrame(() => {
+        this.drawFrame = 0;
+        if (this.running) this.draw();
+      });
+  }
+  cancel() {
+    cancelAnimationFrame(this.frame);
+    cancelAnimationFrame(this.drawFrame);
+    this.drawFrame = 0;
+    this.running = false;
+    this.canvas.style.display = "none";
+    this.current = null;
+    this.next = null;
+    this.canvas.width = 1;
+    this.canvas.height = 1;
   }
   draw() {
     const ctx = this.ctx,
@@ -104,6 +122,8 @@ export class PageCurl {
     ctx.restore();
   }
   release(complete, onfinish) {
+    cancelAnimationFrame(this.drawFrame);
+    this.drawFrame = 0;
     const dest = { x: complete ? -this.w : this.w, y: this.c.y };
     let vx = 0,
       vy = 0,
@@ -122,8 +142,7 @@ export class PageCurl {
         Math.hypot(dest.x - this.p.x, dest.y - this.p.y) < 0.8 &&
         Math.abs(vx) < 4
       ) {
-        this.running = false;
-        this.canvas.style.display = "none";
+        this.cancel();
         onfinish(complete);
       } else this.frame = requestAnimationFrame(step);
     };

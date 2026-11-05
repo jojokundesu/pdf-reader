@@ -2046,3 +2046,96 @@ textarea {
 .studio #studioRedo {
   margin-left: 0;
 }
+
+/* The reader surround is independent of the PDF's paper theme. */
+:root[data-background="black"] {
+  --workspace-bg: #000000;
+  --chrome-bg: #000000;
+  --surface-bg: #101010;
+  --ambient-opacity: 0;
+}
+:root[data-background="charcoal"] {
+  --workspace-bg: #141414;
+  --chrome-bg: #101010;
+  --surface-bg: #202020;
+  --ambient-opacity: 0;
+}
+:root[data-background="forest"] {
+  --workspace-bg: #172827;
+  --chrome-bg: #142321;
+  --surface-bg: #203431;
+  --ambient-opacity: 1;
+}
+:root[data-background="parchment"] {
+  --workspace-bg: #29231e;
+  --chrome-bg: #201b17;
+  --surface-bg: #362e26;
+  --ambient-opacity: 0;
+}
+:root[data-background],
+:root[data-background] body,
+:root[data-background] .stage,
+:root[data-background] .shell {
+  background: var(--workspace-bg);
+}
+:root[data-background] .rail {
+  background: var(--chrome-bg);
+}
+:root[data-background] .reader-toolbar,
+:root[data-background] .studio,
+:root[data-background] .drawer,
+:root[data-background] .popover,
+:root[data-background] dialog,
+:root[data-background] .reference,
+:root[data-background] .focus-return {
+  background: var(--surface-bg);
+}
+:root[data-background] .stage-ambient {
+  opacity: var(--ambient-opacity);
+}
+.book-surface {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.popover {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.background-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 0 4px 8px;
+}
+.background-choice {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 10px 7px;
+  border: 1px solid #ffffff17;
+  border-radius: 7px;
+  font-size: 10px;
+  text-align: left;
+}
+.background-choice[aria-pressed="true"] {
+  border-color: #d3e7ab80;
+  color: var(--accent);
+}
+.background-choice > span {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1px solid #ffffff55;
+  flex-shrink: 0;
+}
+.background-choice > svg {
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+}
+
+:root[data-background="black"] .loading {
+  background: #00000099;
+}

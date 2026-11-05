@@ -2,6 +2,19 @@
 
 A private, touch-first PDF reading room. Real 2D canvas page folds, non-destructive highlights, tactile paperclips, and a library that stays on your device.
 
+## What changed in 1.1.0
+
+- **Grab anywhere in Read mode:** tap/hold the middle, upper or lower area of a page, then drag horizontally. Drag left for next and right for previous; Manga mode reverses this. The direction follows your movement, not which half you touched. Both leaves of a desktop spread accept the gesture.
+- **No accidental flips:** a stationary hold and a vertical movement do nothing. Tiny interior drags spring back. A deliberate drag of roughly 22% of the displayed page width, or a short brisk flick, completes the turn. Corner/edge peels still use their original fold-progress threshold.
+- **Fast flick reliability:** releasing before the next page's composite finishes preparing no longer drops the gesture. Adding a second finger cancels a pending peel and lets pinch zoom take over. Native long-press menus are suppressed on the reading surface.
+- **Pure black by default:** the complete reader surround starts at `#000000`, without the old ambient green/brown tint. Existing libraries with no background preference also receive this default; their PDFs and notes are unchanged.
+- **Independent background options:** open the sun/theme button → **Reader background** for Pure black, Charcoal, Forest, or Warm brown. The choice is saved across books and app restarts. It does not invert, recolor or re-render your PDF. Original paper, Sepia, AMOLED page filtering and E-ink remain separate choices. The image-preservation preference now also survives restarts.
+- **Touch and performance polish:** toolbar menus toggle closed on a second tap and remain within the screen; curl pointer updates are batched to animation frames, and temporary curl snapshots are released after a turn or cancellation. The Android startup, status and navigation backgrounds are black, too.
+
+Select the **hand / Read** tool for anywhere-grab turns. With a marker/eraser selected, a one-finger interior drag still edits ink; use edge gestures, the on-screen arrows or two-finger navigation to turn pages. Above 100% zoom, a one-finger drag pans instead of flipping; return to 100% or use the navigation arrows to turn.
+
+**Updating an older preview:** export a vault backup first and keep your original PDFs. These APKs are debug-signed, and Android can reject an in-place update if the old preview used a different signing key. If you must uninstall it, restore the vault in the new app and re-import your original PDFs to recover matching notes and positions. The new APK's Android version is **1.1.0**, version code **2**.
+
 ## Get the app
 
 - **Android:** Download `FlipVault-Pro-Android-preview.apk` from [Releases](https://github.com/jojokundesu/pdf-reader/releases). Android may ask you to allow installation from your browser. This is a sideloadable **debug-signed preview**, not a Play Store release.
@@ -41,6 +54,7 @@ Native auto-backup targets the OS Documents directory using scoped storage. It m
 | Module | Responsibility |
 | --- | --- |
 | `src/geometry.js` | Half-plane clipping, reflection matrix, spine clamping |
+| `src/gestures.js` | Horizontal intent, displacement-based interior grabs, swipe completion rules |
 | `src/curl.js` | Canvas fold pipeline and spring animation |
 | `src/annotations.js` | Vector strokes, isolated buffers, dual erasure and history |
 | `src/storage.js` | IndexedDB, sampled SHA-256 fingerprints, validated sidecars, native export |
@@ -74,12 +88,13 @@ npm test                            # geometry + storage + hostile-backup valida
 npm run build                       # production bundle and offline shell
 npm run preview -- --port 4173
 TEST_URL=http://localhost:4173 TEST_OFFLINE=1 npm run test:e2e
+TEST_URL=http://localhost:4173 npm run test:update
 npm run test:large                   # synthetic 1,000-page import/navigation
 npx cap sync android                # rebuild web assets first
 cd android && ./gradlew assembleDebug
 ```
 
-The integration suite covers import, drawing, PDF-layer integrity, undo/redo, erasing, paperclips, reload restoration, full-text search, backup/download/restore, valid PDF export, mobile corner drag, focus exit, and offline reload. The bundled Chromium test helper extracts its Linux runtime libraries from the npm package, avoiding an extra browser-download dependency. `CHROME_PATH` may specify an installed Chromium.
+The integration suite includes actual browser touch-event tests for interior long-press drags on either half and either spread leaf, RTL, canceled/tiny/vertical gestures, rapid release during preparation, pure-black pixels, all background choices and preference restoration. It also covers import, drawing, PDF-layer integrity, undo/redo, erasing, paperclips, reload restoration, full-text search, backup/download/restore, valid PDF export, mobile corner drag, focus exit, and offline reload. The bundled Chromium test helper extracts its Linux runtime libraries from the npm package, avoiding an extra browser-download dependency. `CHROME_PATH` may specify an installed Chromium.
 
 `BASE_PATH=/pdf-reader/ npm run build` creates a GitHub Pages-compatible build. Do not use that subpath build inside the Android shell; Android uses the default `/` base.
 

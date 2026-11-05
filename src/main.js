@@ -1,3 +1,4 @@
+import { horizontalIntent, interiorFoldPoint, completeTurn } from "./gestures";
 import "./style.css";
 import {
   createIcons,
@@ -132,6 +133,7 @@ let pdf,
   page = 1,
   tool = "hand",
   theme = "original",
+  background = "black",
   mode = "auto",
   rtl = false,
   zoom = 1,
@@ -165,7 +167,7 @@ app.innerHTML = `
 <main><div class="workspace-header hud"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1></div><button id="focus" class="subtle">${icon("maximize")}<span>Focus mode</span></button></div>
 <div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("hand", "hand", "Read & turn pages", "active")}${btn("marker", "highlighter", "Highlight studio")}${btn("eraser", "eraser", "Eraser studio")}${btn("addClip", "paperclip", "Attach a paperclip")}<span class="divider"></span>${btn("undo", "undo-2", "Undo · Ctrl+Z")}${btn("redo", "redo-2", "Redo · Ctrl+Y")}</div><div class="toolbar-group zoom-group">${btn("zoomOut", "minus", "Zoom out")}<button id="zoomValue" class="zoom-value">100%</button>${btn("zoomIn", "plus", "Zoom in")}<span class="divider"></span>${btn("more", "ellipsis", "More reading tools")}</div></div>
 <div id="studio" class="studio hud" hidden></div>
-<section id="stage" class="stage" aria-label="Interactive PDF reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><canvas id="leftInk" class="annotation"></canvas><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><canvas id="highlightCanvas" class="annotation"></canvas><div id="uiLayer" class="page-ui"></div><div id="brushCursor"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Drag a corner to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
+<section id="stage" class="stage" aria-label="Interactive PDF reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><canvas id="leftInk" class="annotation"></canvas><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><canvas id="highlightCanvas" class="annotation"></canvas><div id="uiLayer" class="page-ui"></div><div id="brushCursor"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
 <footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination">${btn("first", "chevrons-left", "First page")}${btn("prevSmall", "chevron-left", "Previous page")}<label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label>${btn("nextSmall", "chevron-right", "Next page")}${btn("last", "chevrons-right", "Last page")}</div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
 </main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><div id="toast" class="toast" role="status" hidden></div><input id="pdfFile" type="file" accept="application/pdf,.pdf" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
 function refreshIcons() {
@@ -963,14 +965,36 @@ async function searchBook(query) {
   }
   refreshIcons();
 }
+function toggleMenu(id, show) {
+  const pop = $("#popover");
+  if (!pop.hidden && pop.dataset.owner === id) {
+    pop.hidden = true;
+    return;
+  }
+  pop.dataset.owner = id;
+  show();
+}
 function popover(anchor, html) {
   const p = $("#popover");
   p.innerHTML = html;
   p.hidden = false;
   const r = anchor.getBoundingClientRect();
-  p.style.top = Math.min(r.bottom + 10, innerHeight - 300) + "px";
+  p.style.top =
+    Math.max(12, Math.min(r.bottom + 10, innerHeight - p.offsetHeight - 12)) +
+    "px";
   p.style.left = Math.max(12, Math.min(r.left, innerWidth - 275)) + "px";
   refreshIcons();
+}
+function applyBackground() {
+  document.documentElement.dataset.background = background;
+  const colors = {
+    black: "#000000",
+    charcoal: "#141414",
+    forest: "#172827",
+    parchment: "#29231e",
+  };
+  document.querySelector('meta[name="theme-color"]').content =
+    colors[background];
 }
 function applyTheme() {
   document.documentElement.dataset.theme = theme;
@@ -996,7 +1020,19 @@ function showThemes() {
       )
       .join(
         "",
-      )}<label class="menu-item small"><input id="preserveImages" type="checkbox" ${document.body.classList.contains("preserve-images") ? "checked" : ""}> Preserve images in dark mode</label>`,
+      )}<hr><span class="menu-label">READER BACKGROUND · PAPER STAYS UNCHANGED</span><div class="background-options">${[
+      ["black", "Pure black", "#000000"],
+      ["charcoal", "Charcoal", "#141414"],
+      ["forest", "Forest", "#172827"],
+      ["parchment", "Warm brown", "#29231e"],
+    ]
+      .map(
+        ([id, label, color]) =>
+          `<button data-background="${id}" aria-pressed="${background === id}" class="background-choice"><span style="background:${color}"></span>${label}${background === id ? icon("check") : ""}</button>`,
+      )
+      .join(
+        "",
+      )}</div><label class="menu-item small"><input id="preserveImages" type="checkbox" ${document.body.classList.contains("preserve-images") ? "checked" : ""}> Preserve images in dark mode</label>`,
   );
   $$("[data-theme]")
     .filter((el) => el.tagName === "BUTTON")
@@ -1009,13 +1045,23 @@ function showThemes() {
           $("#popover").hidden = true;
         }),
     );
-  $("#preserveImages").onchange = (e) => {
+  $$("button[data-background]").forEach(
+    (el) =>
+      (el.onclick = run(async () => {
+        background = el.dataset.background;
+        applyBackground();
+        await store.put("settings", background, "readerBackground");
+        showThemes();
+      })),
+  );
+  $("#preserveImages").onchange = run(async (e) => {
     document.body.classList.toggle("preserve-images", e.target.checked);
+    await store.put("settings", e.target.checked, "preserveImages");
     if (e.target.checked)
       toast(
         "Image preservation keeps original page colors on AMOLED surroundings.",
       );
-  };
+  });
 }
 function showLayout() {
   popover(
@@ -1313,7 +1359,7 @@ function showHelp() {
     `<div class="shortcut-grid">${[
       ["← / →", "Turn a page"],
       ["H", "Highlight marker"],
-      ["V", "Read & drag corners"],
+      ["V", "Read & drag anywhere"],
       ["E", "Precision / stroke eraser"],
       ["Ctrl + Z / Y", "Undo / redo this page"],
       ["Ctrl + F", "Search this book"],
@@ -1323,7 +1369,7 @@ function showHelp() {
       .map(([key, desc]) => `<kbd>${key}</kbd><span>${desc}</span>`)
       .join(
         "",
-      )}</div><h3>Made for your fingertips.</h3><p>Drag any outer corner or edge to peel a page. Release past 28% or swipe briskly to turn it. Short drags spring back. Pinch to zoom, double-tap to enlarge, and drag to pan when zoomed.</p><p>With a marker active, one finger draws. Tap the thin outer edge or swipe with two fingers to turn pages. Pause a marker for 350ms to straighten it. Paperclips slide along their page edge.</p><div class="info-note">For best performance on phones, use single-page mode. FlipVault limits render resolution and keeps only five nearby high-resolution pages in memory.</div>`,
+      )}</div><h3>Made for your fingertips.</h3><p>In Read mode, hold and drag anywhere on either page: drag left for the next page, right for the previous (reversed in Manga mode). A horizontal movement starts the peel; simply holding still does not turn a page. Short drags spring back. Edge and corner peels still work. Pinch to zoom, double-tap to enlarge, and drag to pan when zoomed.</p><p>With a marker active, one finger draws. Tap the thin outer edge or swipe with two fingers to turn pages. Pause a marker for 350ms to straighten it. Paperclips slide along their page edge.</p><div class="info-note">For best performance on phones, use single-page mode. FlipVault limits render resolution and keeps only five nearby high-resolution pages in memory.</div>`,
   );
 }
 const pointers = new Map();
@@ -1339,6 +1385,16 @@ function annotationPoint(e) {
 function curlPoint(e) {
   const r = $("#rightPage").getBoundingClientRect(),
     w = curl.w;
+  if (gesture.interior)
+    return interiorFoldPoint(
+      w,
+      curl.h,
+      curl.c.y,
+      { x: gesture.startX, y: gesture.startY },
+      e,
+      r,
+      gesture.reverse,
+    );
   return {
     x:
       (gesture.reverse
@@ -1347,20 +1403,62 @@ function curlPoint(e) {
     y: ((e.clientY - r.top) / r.height) * curl.h,
   };
 }
+function pointerSnapshot(e) {
+  return { clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId };
+}
+async function prepareCurl(g) {
+  if (g.preparing || g.curl) return;
+  if (page + g.dir < 1 || page + g.dir > pdf.numPages) {
+    g.blocked = true;
+    return;
+  }
+  g.preparing = true;
+  const activePage = page,
+    activePdf = pdf;
+  try {
+    const current = await composite(page),
+      next = await composite(page + g.dir);
+    if (gesture !== g || pdf !== activePdf || page !== activePage) return;
+    if (!pointers.has(g.pointerId) && !g.releaseEvent) return;
+    const y = g.anchorY;
+    const anchor = g.interior
+      ? y * current.height
+      : y < 0.22
+        ? 0
+        : y > 0.78
+          ? current.height
+          : y * current.height;
+    curl.begin(current, next, anchor, g.reverse);
+    g.curl = true;
+    if (
+      g.latest &&
+      Math.hypot(g.latest.clientX - g.startX, g.latest.clientY - g.startY) > 0
+    )
+      curl.move(curlPoint(g.latest));
+  } finally {
+    g.preparing = false;
+  }
+  if (gesture === g && g.releaseEvent)
+    await pointerEnd(g.releaseEvent, g.canceled);
+}
 const surface = $("#bookSurface");
+surface.addEventListener("contextmenu", (e) => e.preventDefault());
 surface.addEventListener(
   "pointerdown",
   run(async (e) => {
-    if (!ready || turning || e.target.closest("button")) return;
+    if (
+      !ready ||
+      turning ||
+      e.target.closest("button") ||
+      (e.pointerType === "mouse" && e.button !== 0)
+    )
+      return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     surface.setPointerCapture(e.pointerId);
     if (pointers.size === 2) {
       if (gesture?.drawing) ann.cancel();
       clearTimeout(holdTimer);
-      if (curl.running) {
-        curl.running = false;
-        curl.canvas.style.display = "none";
-      }
+      if (curl.running) curl.cancel();
       const pts = [...pointers.values()];
       gesture = {
         pinch: true,
@@ -1375,17 +1473,32 @@ surface.addEventListener(
     const r = $("#rightPage").getBoundingClientRect(),
       x = (e.clientX - r.left) / r.width,
       y = (e.clientY - r.top) / r.height;
-    const onRight = x >= 0 && x <= 1;
-    const edge = x < 0.045 || x > 0.955;
+    const onRight = x >= 0 && x <= 1 && y >= 0 && y <= 1;
+    const leftRect = $("#leftPage").getBoundingClientRect();
+    const onLeft =
+      isSpread() &&
+      e.clientX >= leftRect.left &&
+      e.clientX <= leftRect.right &&
+      e.clientY >= leftRect.top &&
+      e.clientY <= leftRect.bottom;
+    if (!onRight && !onLeft) {
+      gesture = null;
+      return;
+    }
+    const edge = onRight && (x < 0.045 || x > 0.955);
     gesture = {
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       lastX: e.clientX,
       lastTime: performance.now(),
       velocity: 0,
       drawing: false,
-      dir: x < 0.5 ? -1 : 1,
       edge,
+      interior: !edge,
+      anchorY: Math.max(0, Math.min(1, y)),
+      latest: pointerSnapshot(e),
+      leftPage: onLeft ? +$("#leftPage").dataset.page : null,
     };
     if (tool !== "hand" && onRight && !edge) {
       gesture.drawing = true;
@@ -1407,33 +1520,14 @@ surface.addEventListener(
       gesture.scrollY = $("#bookViewport").scrollTop;
       return;
     }
-    if (onRight && x > 0.15 && x < 0.85) {
+    if (onLeft && tool !== "hand") return;
+    if (!edge) {
+      gesture.pending = true;
       return;
     }
-    const dir = (x < 0.5 ? -1 : 1) * (rtl ? -1 : 1);
-    gesture.dir = dir;
     gesture.reverse = x < 0.5;
-    if (!onRight && isSpread()) {
-      if (+$("#leftPage").dataset.page) {
-        await go(+$("#leftPage").dataset.page);
-        gesture = null;
-      }
-      return;
-    }
-    if (page + dir < 1 || page + dir > pdf.numPages) {
-      gesture = null;
-      return;
-    }
-    const g = gesture;
-    g.preparing = true;
-    const current = await composite(page),
-      next = await composite(page + dir);
-    if (gesture !== g || !pointers.has(e.pointerId)) return;
-    const anchor =
-      y < 0.22 ? 0 : y > 0.78 ? current.height : y * current.height;
-    curl.begin(current, next, anchor, g.reverse);
-    g.preparing = false;
-    g.curl = true;
+    gesture.dir = (gesture.reverse ? -1 : 1) * (rtl ? -1 : 1);
+    await prepareCurl(gesture);
   }),
 );
 surface.addEventListener("pointermove", (e) => {
@@ -1473,14 +1567,26 @@ surface.addEventListener("pointermove", (e) => {
       gesture.scrollY - (e.clientY - gesture.startY);
     return;
   }
-  if (gesture.curl) {
-    const now = performance.now();
-    gesture.velocity =
-      (e.clientX - gesture.lastX) / (now - gesture.lastTime || 1);
-    gesture.lastX = e.clientX;
-    gesture.lastTime = now;
-    curl.move(curlPoint(e));
+  const g = gesture,
+    now = performance.now();
+  g.latest = pointerSnapshot(e);
+  g.velocity = (e.clientX - g.lastX) / (now - g.lastTime || 1);
+  g.lastX = e.clientX;
+  g.lastTime = now;
+  if (
+    (g.pending || g.blocked) &&
+    horizontalIntent(e.clientX - g.startX, e.clientY - g.startY)
+  ) {
+    g.pending = false;
+    g.blocked = false;
+    g.reverse = e.clientX > g.startX;
+    g.dir = (g.reverse ? -1 : 1) * (rtl ? -1 : 1);
+    prepareCurl(g).catch((error) => {
+      if (gesture === g) gesture = null;
+      fail(error);
+    });
   }
+  if (g.curl) curl.move(curlPoint(e));
 });
 async function pointerEnd(e, cancel = false) {
   pointers.delete(e.pointerId);
@@ -1497,6 +1603,11 @@ async function pointerEnd(e, cancel = false) {
     }
     return;
   }
+  if (g.preparing) {
+    g.releaseEvent = pointerSnapshot(e);
+    g.canceled = cancel;
+    return;
+  }
   gesture = null;
   if (g.drawing) {
     ann.finish();
@@ -1508,7 +1619,15 @@ async function pointerEnd(e, cancel = false) {
         (performance.now() - g.lastTime > 90 ? 0 : g.velocity) *
         (g.reverse ? -1 : 1),
       progress = (curl.w - curl.p.x) / (2 * curl.w);
-    const complete = !cancel && (progress > 0.28 || vx < -0.45 || distance < 7);
+    const complete = completeTurn({
+      canceled: cancel,
+      interior: g.interior,
+      progress,
+      velocity: vx,
+      distance,
+      horizontalDistance: Math.abs(e.clientX - g.startX),
+      pageWidth: $("#rightPage").getBoundingClientRect().width,
+    });
     turning = true;
     if (complete) sound(Math.abs(vx));
     curl.release(complete, (done) => {
@@ -1519,13 +1638,26 @@ async function pointerEnd(e, cancel = false) {
     });
     return;
   }
+  if (cancel) {
+    lastTap = 0;
+    return;
+  }
+  if (
+    g.leftPage &&
+    !g.pan &&
+    Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < 8
+  ) {
+    await go(g.leftPage);
+    return;
+  }
   const now = Date.now();
   if (
     now - lastTap < 300 &&
     Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < 8
   )
     setZoom(zoom === 1 ? 2 : 1);
-  lastTap = now;
+  lastTap =
+    Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < 8 ? now : 0;
 }
 surface.addEventListener(
   "pointerup",
@@ -1573,11 +1705,11 @@ on("eraser", () => setTool("eraser"));
 on("addClip", () => editClip());
 on("undo", () => ann.undo());
 on("redo", () => ann.redo());
-on("theme", showThemes);
-on("layout", showLayout);
+on("theme", () => toggleMenu("theme", showThemes));
+on("layout", () => toggleMenu("layout", showLayout));
 on("vault", showVault);
-on("export", showExport);
-on("more", showMore);
+on("export", () => toggleMenu("export", showExport));
+on("more", () => toggleMenu("more", showMore));
 on("import", () => $("#pdfFile").click());
 on("prev", () => go(page - (rtl ? -1 : 1), true));
 on("next", () => go(page + (rtl ? -1 : 1), true));
@@ -1713,6 +1845,17 @@ window.addEventListener(
 );
 async function init() {
   await store.openDB();
+  const savedBackground = await store.get("settings", "readerBackground");
+  background = ["black", "charcoal", "forest", "parchment"].includes(
+    savedBackground,
+  )
+    ? savedBackground
+    : "black";
+  applyBackground();
+  document.body.classList.toggle(
+    "preserve-images",
+    !!(await store.get("settings", "preserveImages")),
+  );
   navigator.storage?.persist?.().catch(() => {});
   nativeVaultEnabled =
     store.isNative() && !!(await store.get("settings", "nativeAutoBackup"));

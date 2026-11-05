@@ -25,7 +25,7 @@ jobs:
           npx wait-on --timeout 30000 http-get://localhost:4173
           set +e
           export TEST_URL=http://localhost:4173 TEST_OFFLINE=1
-          (npm run test:e2e && npm run test:large) > e2e.log 2>&1
+          (npm run test:e2e && npm run test:update && npm run test:large) > e2e.log 2>&1
           RESULT=$?
           cat e2e.log
           if [ "$RESULT" -ne 0 ]; then
@@ -83,6 +83,6 @@ jobs:
           (cd dist && zip -q -r ../FlipVault-Pro-web.zip .)
           TAG="preview-${GITHUB_SHA:0:7}"
           gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
-            --title "FlipVault Pro · Android preview ${GITHUB_SHA:0:7}" \
-            --notes "Install FlipVault-Pro-Android-preview.apk on Android, or host the web ZIP on HTTPS. The APK is a debug-signed sideload preview, not a Play Store release. Browser integration and offline tests passed; physical Realme 9i testing is still needed. Back up your vault before uninstalling or replacing an earlier preview. See README for features, backup/recovery instructions and known limitations." \
+            --title "FlipVault Pro 1.1.0 · Anywhere-drag & pure-black preview" \
+            --notes "Version 1.1.0: grab and drag from anywhere in Read mode; pure-black default background plus independent saved background choices; touch and memory refinements. Install FlipVault-Pro-Android-preview.apk on Android, or host the web ZIP on HTTPS. The APK is a debug-signed sideload preview, not a Play Store release. Browser integration and offline tests passed; physical Realme 9i testing is still needed. Back up your vault before uninstalling or replacing an earlier preview. See README for features, backup/recovery instructions and known limitations." \
             FlipVault-Pro-Android-preview.apk FlipVault-Pro-web.zip
