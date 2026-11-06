@@ -126,7 +126,7 @@ jobs:
           original PDFs before migrating. This workflow performs no device-level install or upgrade test.
           NOTES
           } > "$RUNNER_TEMP/release-notes.md"
-          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+          gh release create "$TAG" --target "$GITHUB_SHA" \
             --title "FlipVault Pro $VERSION · Persistently signed Android build" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             FlipVault-Pro-Android.apk FlipVault-Pro-web.zip FlipVault-Pro-signing-certificate.sha256
