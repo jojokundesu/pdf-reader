@@ -22,10 +22,39 @@ try {
   await page.waitForFunction(
     () => document.querySelectorAll(".thumb").length === 12,
   );
-  await page.waitForTimeout(1000);
-  if (await page.locator("#dialog").isVisible())
+  await page.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return true;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+    if (!db) return false;
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+      request.onerror = () => resolve(false);
+    });
+  });
+  if (await page.locator("#tutorialSkip").isVisible())
     await page.locator("#tutorialSkip").click();
-  await page.waitForFunction(() => !document.querySelector("#dialog").open);
+  await page.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return false;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+    });
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+    });
+  });
   const started = performance.now();
   await page.locator("#pdfFile").setInputFiles({
     name: "1000-page-study.pdf",
