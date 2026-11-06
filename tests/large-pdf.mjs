@@ -22,6 +22,10 @@ try {
   await page.waitForFunction(
     () => document.querySelectorAll(".thumb").length === 12,
   );
+  await page.waitForTimeout(1000);
+  if (await page.locator("#dialog").isVisible())
+    await page.locator("#tutorialSkip").click();
+  await page.waitForFunction(() => !document.querySelector("#dialog").open);
   const started = performance.now();
   await page.locator("#pdfFile").setInputFiles({
     name: "1000-page-study.pdf",

@@ -3,13 +3,22 @@
 A private, offline PDF reading room for Android and the browser. Real 2D canvas page folds,
 non-destructive highlighting, paperclip bookmarks and a library that stays on your device.
 
+## What is new in 1.3.0
+
+- Focus mode now has a dedicated touch-friendly Reader tools panel with page bookmarks, marker, eraser, zoom, sound, search and settings, without leaving the immersive reader.
+- Page thumbnails can be opened inside focus mode; the main toolbar and exit control remain visible and readable.
+- Added a short first-use tutorial with a replay option. Help now explains touch gestures and app tools.
+- Popovers, dialogs, drawers, tool studios and the reference panel can be minimized and resumed instead of forcing the reader to close the app.
+- Fixed reverse page folds: the revealed page remains correctly oriented, with a cleaner backward-turn animation and no interim inverted rendering.
+- Verified layout, theme, background and annotation controls through browser integration tests.
+
 ## What is in this release
 
-| File | What it is |
-| --- | --- |
-| `FlipVault-Pro-Android.apk` | Android app, package `com.flipvault.pro`, complete offline reader and PDF engine |
-| `FlipVault-Pro-web.zip` | Same app as a static website; unzip onto any HTTPS host |
-| `FlipVault-Pro-signing-certificate.sha256` | Public SHA-256 certificate fingerprint of the signing key used for this build |
+| File                                       | What it is                                                                       |
+| ------------------------------------------ | -------------------------------------------------------------------------------- |
+| `FlipVault-Pro-Android.apk`                | Android app, package `com.flipvault.pro`, complete offline reader and PDF engine |
+| `FlipVault-Pro-web.zip`                    | Same app as a static website; unzip onto any HTTPS host                          |
+| `FlipVault-Pro-signing-certificate.sha256` | Public SHA-256 certificate fingerprint of the signing key used for this build    |
 
 Requirements: Android 8.0 (API 26) or newer for the APK. The web build needs a current browser with
 IndexedDB; hosting it over HTTPS enables install-to-home-screen.
@@ -18,8 +27,8 @@ IndexedDB; hosting it over HTTPS enables install-to-home-screen.
 
 1. Download `FlipVault-Pro-Android.apk` on the phone.
 2. Tap the file and allow installing from the browser/file manager if Android asks.
-3. Open **FlipVault Pro**. The first launch creates a 12-page sample book, *The art of paying
-   attention*, so the reader is usable immediately.
+3. Open **FlipVault Pro**. The first launch creates a 12-page sample book, _The art of paying
+   attention_, so the reader is usable immediately.
 4. Use **+** on the bookshelf to import your own PDFs from device storage or a cloud provider.
 
 Updating later: install the newer `FlipVault-Pro-Android.apk` over the top of the existing app.
@@ -81,7 +90,7 @@ and the version code increases. No uninstall is needed.
 ## Known limitations
 
 - A planar folded-paper simulation with cylindrical lighting, not a fully deformable 3D mesh; the
-  backface is a reflected, translucent copy of the artwork.
+  backface is a reflected copy of the artwork with paper shading.
 - Encrypted/password-protected PDFs are rejected. There is no OCR, cloud sync or account recovery.
 - Search pulses the destination page instead of aligning word overlays, so image-only scans need
   OCR elsewhere.

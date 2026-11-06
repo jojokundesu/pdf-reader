@@ -54,9 +54,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk FlipVault-Pro-1.2.0-side-by-side-preview.apk
-          (cd dist && zip -q -r ../FlipVault-Pro-1.2.0-web.zip .)
+          cp android/app/build/outputs/apk/debug/app-debug.apk FlipVault-Pro-1.3.0-side-by-side-preview.apk
+          (cd dist && zip -q -r ../FlipVault-Pro-1.3.0-web.zip .)
           gh release create "side-preview-${GITHUB_SHA:0:7}" --target "$GITHUB_SHA" --prerelease \
-            --title "FlipVault Pro 1.2.0 · Separate preview with recorded page sound" \
+            --title "FlipVault Pro 1.3.0 · Separate preview with recorded page sound" \
             --notes "Optional side-by-side test build. Installs as FlipVault Preview (com.flipvault.pro.preview) next to the main FlipVault Pro app, with its own books and notes; import a vault backup and the original PDFs if you want them there. It uses a temporary debug signing key, so it is not an update channel for the main app. The main release is published by the Verify app & publish signed Android release workflow. Physical-device install testing remains outstanding." \
-            FlipVault-Pro-1.2.0-side-by-side-preview.apk FlipVault-Pro-1.2.0-web.zip
+            FlipVault-Pro-1.3.0-side-by-side-preview.apk FlipVault-Pro-1.3.0-web.zip

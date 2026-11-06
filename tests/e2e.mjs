@@ -49,9 +49,103 @@ try {
   await ready();
   await p.waitForTimeout(600);
   assert.equal(await p.locator(".thumb").count(), 12);
+  assert.equal(await p.locator("#dialog").isVisible(), true);
+  assert.match(
+    await p.locator("#dialog h2").textContent(),
+    /Welcome to FlipVault/,
+  );
+  await p.locator("#minimizeDialog").click();
+  assert.equal(await p.locator("#resumeDialog").isVisible(), true);
+  await p.locator("#resumeDialog").click();
+  await p.locator("#tutorialNext").click();
+  await p.locator("#tutorialNext").click();
+  assert.match(
+    await p.locator("#dialog h2").textContent(),
+    /Settle in your way/,
+  );
+  await p.locator("#tutorialBack").click();
+  await p.locator("#tutorialNext").click();
+  await p.locator("#tutorialSkip").click();
+  await p.locator("#theme").click();
+  assert.equal(await p.locator("#popover").isVisible(), true);
+  await p.locator("#minimizePopover").click();
+  assert.equal(await p.locator("#resumePopover").isVisible(), true);
+  await p.locator("#resumePopover").click();
+  assert.equal(await p.locator("#popover").isVisible(), true);
+  for (const theme of ["sepia", "dark", "ink", "original"]) {
+    await p.locator(`[data-theme="${theme}"]`).click();
+    assert.equal(await p.locator("html").getAttribute("data-theme"), theme);
+    if (theme !== "original") await p.locator("#theme").click();
+  }
+  await p.locator("#theme").click();
+  for (const background of ["charcoal", "forest", "parchment", "black"]) {
+    await p.locator(`button[data-background="${background}"]`).click();
+    assert.equal(
+      await p.locator("html").getAttribute("data-background"),
+      background,
+    );
+  }
+  await p.locator("#preserveImages").check();
+  assert.equal(
+    await p
+      .locator("body")
+      .evaluate((el) => el.classList.contains("preserve-images")),
+    true,
+  );
+  await p.locator("#preserveImages").uncheck();
+  assert.equal(
+    await p
+      .locator("body")
+      .evaluate((el) => el.classList.contains("preserve-images")),
+    false,
+  );
+  await p.locator("#library").click();
+  await p.waitForSelector("#drawer:not([hidden])");
+  await p.locator("#minimizeDrawer").click();
+  assert.equal(await p.locator("#resumeDrawer").isVisible(), true);
+  await p.locator("#resumeDrawer").click();
+  await p.locator("#closeDrawer").click();
+  await p.locator("#more").click();
+  await p.locator("#referenceTool").click();
+  await p.waitForFunction(() => !document.querySelector("#reference").hidden);
+  assert.equal(await p.locator("#referenceCanvas").isVisible(), true);
+  await p.locator("#minimizeReference").click();
+  assert.equal(await p.locator("#resumeReference").isVisible(), true);
+  await p.locator("#resumeReference").click();
+  assert.equal(await p.locator("#referenceCanvas").isVisible(), true);
+  await p.locator("#closeReference").click();
+  await p.locator("#more").click();
+  await p.locator("#focusTimer").click();
+  assert.match(await p.locator("#sessionLabel").textContent(), /FOCUS/);
+  await p.locator("#more").click();
+  await p.locator("#focusTimer").click();
+  assert.doesNotMatch(await p.locator("#sessionLabel").textContent(), /FOCUS/);
+  console.log(
+    "PASS first-run tutorial, repeatable/minimizable overlays and settings menu",
+  );
   console.log("PASS demo PDF and virtualized thumbnails");
+  console.log("PASS production reader starts with the built-in sample book");
   await p.locator("#nextSmall").click();
   await pageNum(2);
+  await p.locator("#layout").click();
+  await p.locator('[data-mode="single"]').click();
+  await p.waitForFunction(
+    () => !document.querySelector("#bookSurface").classList.contains("spread"),
+  );
+  await p.locator("#layout").click();
+  await p.locator('[data-mode="spread"]').click();
+  await p.waitForFunction(() =>
+    document.querySelector("#bookSurface").classList.contains("spread"),
+  );
+  await p.locator("#layout").click();
+  await p.locator("#rtlToggle").check();
+  assert.equal(
+    (await p.locator("body").evaluate((el) => el.classList.contains("rtl"))) ||
+      (await p.locator("#rtlToggle").isChecked()),
+    true,
+  );
+  await p.locator("#rtlToggle").uncheck();
+  await p.locator('[data-mode="auto"]').click();
   await p.waitForTimeout(400);
   await p.locator("#marker").click();
   let r = await p.locator("#rightPage").boundingBox();
@@ -151,6 +245,22 @@ try {
   await p.waitForTimeout(350);
   console.log("PASS mobile edge drag and spring-completed canvas curl");
   r = await p.locator("#rightPage").boundingBox();
+  await p.mouse.move(r.x + r.width * 0.45, r.y + r.height * 0.5);
+  await p.mouse.down();
+  await p.waitForTimeout(100);
+  await p.mouse.move(r.x + r.width * 0.92, r.y + r.height * 0.5, { steps: 10 });
+  assert.equal(
+    await p.locator("#curlCanvas").evaluate((c) => getComputedStyle(c).display),
+    "block",
+  );
+  await p.mouse.up();
+  await pageNum(2);
+  await p.locator("#nextSmall").click();
+  await pageNum(3);
+  console.log(
+    "PASS right-to-left interior drag returns to the previous page without a rendering flash",
+  );
+  r = await p.locator("#rightPage").boundingBox();
   await p.mouse.dblclick(r.x + r.width * 0.5, r.y + r.height * 0.4, {
     delay: 80,
   });
@@ -187,8 +297,51 @@ try {
   console.log("PASS double-tap and multi-touch pinch zoom");
   await p.locator("#focus").click();
   assert.equal(await p.locator("#exitFocus").isVisible(), true);
+  assert.equal(await p.locator("#focusTools").isVisible(), true);
+  await p.locator("#focusTools").click();
+  assert.equal(await p.locator("#focusPanel").isVisible(), true);
+  assert.equal(await p.locator("#focusTools svg").count(), 1);
+  assert.equal(await p.locator('[data-focus="bookmark"] svg').count(), 1);
+  for (const id of [
+    "hand",
+    "marker",
+    "eraser",
+    "bookmark",
+    "zoom-in",
+    "zoom-out",
+    "sound",
+    "search",
+    "more",
+    "tutorial",
+  ])
+    assert.equal(
+      await p.locator(`[data-focus="${id}"]`).count(),
+      1,
+      `missing focus action ${id}`,
+    );
+  assert.equal(await p.locator("#focusFilmstrip").count(), 1);
+  await p.locator('[data-focus="bookmark"]').click();
+  assert.equal(await p.locator("#dialog").isVisible(), true);
+  assert.equal(await p.locator("#clipNote").count(), 1);
+  await p.locator("#closeDialog").click();
+  await p.locator('[data-focus="marker"]').click();
+  assert.equal(await p.locator("#studio").isVisible(), true);
+  await p.locator('[data-focus="eraser"]').click();
+  assert.equal(await p.locator("#studio").isVisible(), true);
+  await p.locator("#focusFilmstrip").click();
+  assert.equal(
+    await p
+      .locator("body")
+      .evaluate((el) => el.classList.contains("focus-filmstrip")),
+    true,
+  );
+  assert.equal(await p.locator("#filmstrip").isVisible(), true);
+  await p.locator("#minimizeFocusTools").click();
+  assert.equal(await p.locator("#focusPanel").isVisible(), false);
   await p.locator("#exitFocus").click();
-  console.log("PASS mobile focus mode has accessible exit");
+  console.log(
+    "PASS focus mode offers readable reader tools, page thumbnails and accessible exit",
+  );
   await p.screenshot({ path: "test-results/mobile-final.png" });
   assert.deepEqual(errors, []);
   console.log("PASS no uncaught browser errors");

@@ -1338,25 +1338,6 @@ textarea {
   color: #aac095;
   line-height: 1.8;
 }
-.shortcut-grid {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 12px;
-  align-items: center;
-  margin: 20px 0 28px;
-}
-.shortcut-grid kbd {
-  background: #ffffff08;
-  border: 1px solid #ffffff17;
-  border-radius: 5px;
-  padding: 5px 8px;
-  font-size: 10px;
-  width: fit-content;
-  color: #d2e4bb;
-}
-.shortcut-grid span {
-  font-size: 11px;
-}
 .reference {
   position: fixed;
   bottom: 30px;
@@ -1963,9 +1944,6 @@ textarea {
   .dialog-actions button {
     font-size: 11px;
   }
-  .shortcut-grid {
-    grid-template-columns: 120px 1fr;
-  }
   .book-surface.spread {
     --page-w: 140px;
   }
@@ -2138,4 +2116,353 @@ textarea {
 
 :root[data-background="black"] .loading {
   background: #00000099;
+}
+
+/* Persistent, touch-first controls for the reader's immersive mode. */
+.focus-tools-button {
+  display: none;
+  position: fixed;
+  top: 132px;
+  right: 16px;
+  z-index: 42;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 14px;
+  color: #e4edce;
+  background: #111b18f2;
+  border: 1px solid #c9dda64d;
+  border-radius: 13px;
+  box-shadow: 0 6px 28px #0008;
+  font-size: 13px;
+  touch-action: manipulation;
+}
+.focus-tools-button svg {
+  width: 19px;
+  height: 19px;
+}
+.focus-mode .focus-tools-button {
+  display: flex;
+}
+.focus-tools-button:focus-visible,
+.focus-tools-panel button:focus-visible,
+.resume-popup:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.focus-tools-panel {
+  position: fixed;
+  top: 188px;
+  right: 16px;
+  z-index: 43;
+  width: min(330px, calc(100vw - 28px));
+  padding: 12px;
+  color: #e2ead5;
+  background: #111b18f5;
+  border: 1px solid #c9dda650;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px #000a;
+  backdrop-filter: blur(18px);
+}
+.focus-tools-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 10px 10px;
+}
+.focus-tools-head strong {
+  font:
+    18px Georgia,
+    serif;
+}
+.focus-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.focus-tools-grid button {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid #ffffff12;
+  border-radius: 10px;
+  background: #ffffff08;
+  color: #d6e3c7;
+  text-align: left;
+  font-size: 12px;
+  touch-action: manipulation;
+}
+.focus-tools-grid button:active {
+  background: #c9dda625;
+}
+.focus-tools-grid button svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: #c9dda6;
+}
+.focus-tools-grid button[aria-pressed="true"] {
+  border-color: #c9dda6aa;
+  background: #c9dda61d;
+}
+.focus-mode .reader-toolbar {
+  opacity: 1;
+  background: #101916f5;
+  box-shadow: 0 8px 24px #0005;
+}
+.focus-mode .reader-toolbar:hover {
+  opacity: 1;
+}
+.focus-mode .stage-caption {
+  opacity: 0.8;
+}
+.focus-mode.hud-idle .reader-toolbar,
+.focus-mode.hud-idle .stage-caption,
+.focus-mode.hud-idle .focus-return {
+  opacity: 1;
+}
+.focus-mode .page-nav {
+  z-index: 14;
+  width: 48px;
+  height: 64px;
+  color: #d8e7bd;
+  background: #101916cc;
+  border: 1px solid #ffffff18;
+  border-radius: 18px;
+}
+.focus-mode.focus-filmstrip .bottom-panel {
+  display: block;
+  position: fixed;
+  z-index: 30;
+  left: 16px;
+  right: 16px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  padding: 5px 12px 8px;
+  border: 1px solid #c9dda633;
+  border-radius: 14px;
+  background: #101916ee;
+  box-shadow: 0 10px 35px #0008;
+  backdrop-filter: blur(14px);
+}
+.focus-mode.focus-filmstrip .page-controls,
+.focus-mode.focus-filmstrip .footer-note {
+  display: none;
+}
+.focus-mode.focus-filmstrip .filmstrip {
+  height: 96px;
+  gap: 11px;
+}
+.focus-mode.focus-filmstrip .thumb-paper {
+  width: 48px;
+  height: 66px;
+}
+.focus-mode.focus-filmstrip .thumb {
+  min-width: 48px;
+  width: 48px;
+}
+.dialog-window-actions,
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.dialog-window-actions .icon-btn {
+  min-width: 40px;
+  min-height: 40px;
+}
+.popover-window-actions {
+  display: flex;
+  justify-content: flex-end;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -4px -4px 2px;
+  background: inherit;
+}
+.popover-window-actions .icon-btn {
+  min-width: 36px;
+  min-height: 36px;
+}
+.resume-popup {
+  position: fixed;
+  z-index: 80;
+  right: 16px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid #c9dda680;
+  border-radius: 14px;
+  background: #21392f;
+  color: #e2ead5;
+  box-shadow: 0 8px 30px #0009;
+}
+.resume-popup svg {
+  width: 18px;
+  height: 18px;
+}
+.resume-drawer {
+  right: auto;
+  left: 16px;
+}
+.resume-menu {
+  bottom: auto;
+  top: 132px;
+}
+.focus-return {
+  min-height: 46px;
+  font-size: 13px;
+}
+.dialog-body {
+  max-height: min(65dvh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gesture-guide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin: 16px 0;
+}
+.gesture-guide article {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  column-gap: 9px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #ffffff13;
+  border-radius: 11px;
+  background: #ffffff08;
+}
+.gesture-guide article > span {
+  grid-row: span 2;
+  color: #d1e4ad;
+}
+.gesture-guide svg {
+  width: 21px;
+  height: 21px;
+}
+.gesture-guide strong {
+  color: #dce7cf;
+  font-size: 12px;
+}
+.gesture-guide small {
+  font-size: 10px;
+  line-height: 1.5;
+}
+.tutorial-card {
+  text-align: center;
+}
+.tutorial-eyebrow {
+  font-size: 9px;
+  letter-spacing: 1.7px;
+  color: #c9dda6;
+}
+.tutorial-illustration {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin: 18px auto 8px;
+  border: 1px solid #c9dda650;
+  border-radius: 20px;
+  background: #c9dda612;
+  color: #d9e8bf;
+}
+.tutorial-illustration svg {
+  width: 34px;
+  height: 34px;
+}
+.tutorial-card p {
+  max-width: 400px;
+  margin: 12px auto;
+  font-size: 14px;
+}
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 18px;
+}
+.tutorial-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffffff35;
+}
+.tutorial-dots span.active {
+  width: 21px;
+  border-radius: 8px;
+  background: #c9dda6;
+}
+.tutorial-spacer {
+  flex: 1;
+}
+.dialog-actions:has(.tutorial-spacer) {
+  justify-content: stretch;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .focus-tools-button {
+    top: 112px;
+    right: 10px;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+  .focus-tools-panel {
+    top: 166px;
+    right: 10px;
+    width: min(330px, calc(100vw - 20px));
+  }
+  .gesture-guide {
+    grid-template-columns: 1fr;
+  }
+  .focus-mode.focus-filmstrip .bottom-panel {
+    left: 8px;
+    right: 8px;
+  }
+  .focus-mode.focus-filmstrip .filmstrip {
+    justify-content: flex-start;
+  }
+  .dialog-actions:has(.tutorial-spacer) {
+    flex-wrap: wrap;
+  }
+  .tutorial-spacer {
+    display: none;
+  }
+  .dialog-actions:has(.tutorial-spacer) button:first-child {
+    margin-right: auto;
+  }
+}
+.focus-mode .focus-return {
+  top: 118px;
+  left: 16px;
+  right: auto;
+}
+.focus-mode .focus-tools-button {
+  top: 118px;
+  right: 16px;
+}
+.focus-mode .focus-tools-panel {
+  top: 174px;
+}
+@media (max-width: 600px) {
+  .focus-mode .focus-return {
+    top: 118px;
+    left: 10px;
+    right: auto;
+  }
+  .focus-mode .focus-tools-button {
+    top: 118px;
+    right: 10px;
+  }
+  .focus-mode .focus-tools-panel {
+    top: 174px;
+  }
 }

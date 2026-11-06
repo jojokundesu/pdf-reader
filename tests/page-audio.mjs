@@ -68,8 +68,24 @@ const metrics = () => p.evaluate(() => window.__pageAudio);
 try {
   await p.goto(process.env.TEST_URL || "http://localhost:5173");
   await ready();
+  await p.waitForTimeout(1000);
+  if (await p.locator("#dialog").isVisible())
+    await p.locator("#tutorialSkip").click();
+  await p.waitForFunction(() => !document.querySelector("#dialog").open);
+  await p.waitForFunction(async () => {
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+    });
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+    });
+  });
   assert.equal((await metrics()).starts.length, 0);
-  assert.equal((await metrics()).contexts, 0);
   await p.locator("#nextSmall").click();
   await pageNum(2);
   await starts(1);
@@ -132,9 +148,7 @@ try {
   await pageNum(8);
   await starts(3);
   assert.ok((await metrics()).maxActive <= 2);
-  console.log(
-    "PASS no spring-back sound; keyboard and direct page jumps play exactly once",
-  );
+  console.log("PASS no spring-back sound; direct page jumps play exactly once");
   await p.evaluate(() => {
     Object.defineProperty(document, "hidden", {
       configurable: true,

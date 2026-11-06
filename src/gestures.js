@@ -13,9 +13,11 @@ export function interiorFoldPoint(
   reverse,
 ) {
   return {
-    x:
-      width +
-      ((pointer.clientX - start.x) / rect.width) * width * (reverse ? -1 : 1),
+    // A backward fold lifts from the left edge, so its fold point is measured
+    // from that edge instead of from the right one.
+    x: reverse
+      ? ((pointer.clientX - start.x) / rect.width) * width
+      : width + ((pointer.clientX - start.x) / rect.width) * width,
     y: anchorY + ((pointer.clientY - start.y) / rect.height) * height,
   };
 }

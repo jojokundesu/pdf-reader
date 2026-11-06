@@ -6,7 +6,9 @@ import {
   createIcons,
   ArrowUpRight,
   BookOpen,
+  BookOpenCheck,
   BookOpenText,
+  BookmarkPlus,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -28,15 +30,17 @@ import {
   GalleryHorizontalEnd,
   Hand,
   Highlighter,
-  Keyboard,
   LibraryBig,
   LockKeyhole,
   Maximize,
+  Menu,
+  MessageSquare,
   Minimize,
   Minus,
   Moon,
   MoveHorizontal,
   NotebookPen,
+  PanelRightOpen,
   PanelsLeftBottom,
   PanelsTopLeft,
   Paperclip,
@@ -44,6 +48,7 @@ import {
   Redo2,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   Smartphone,
   Sun,
   Timer,
@@ -56,7 +61,9 @@ import {
 const icons = {
   ArrowUpRight,
   BookOpen,
+  BookOpenCheck,
   BookOpenText,
+  BookmarkPlus,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -78,15 +85,17 @@ const icons = {
   GalleryHorizontalEnd,
   Hand,
   Highlighter,
-  Keyboard,
   LibraryBig,
   LockKeyhole,
   Maximize,
+  Menu,
+  MessageSquare,
   Minimize,
   Minus,
   Moon,
   MoveHorizontal,
   NotebookPen,
+  PanelRightOpen,
   PanelsLeftBottom,
   PanelsTopLeft,
   Paperclip,
@@ -94,6 +103,7 @@ const icons = {
   Redo2,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   Smartphone,
   Sun,
   Timer,
@@ -101,6 +111,7 @@ const icons = {
   Undo2,
   Volume2,
   VolumeX,
+  X,
 };
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
@@ -164,14 +175,14 @@ let brush = { color: "#FFEB3B", width: 18, opacity: 0.38, straight: false },
   referencePage = 1;
 const app = $("#app");
 app.innerHTML = `
-<aside class="rail"><a class="brand" href="#" aria-label="FlipVault home">${icon("book-open")}</a><div class="rail-group">${btn("library", "library-big", "Your library")}${btn("reader", "book-open-text", "Reading room", "active")}${btn("clips", "paperclip", "Paperclips & notes")}${btn("search", "search", "Search this book")}</div><div class="rail-bottom">${btn("help", "circle-help", "Help & keyboard shortcuts")}<span class="avatar">Y</span></div></aside>
+<aside class="rail"><a class="brand" href="#" aria-label="FlipVault home">${icon("book-open")}</a><div class="rail-group">${btn("library", "library-big", "Your library")}${btn("reader", "book-open-text", "Reading room", "active")}${btn("clips", "paperclip", "Paperclips & notes")}${btn("search", "search", "Search this book")}</div><div class="rail-bottom">${btn("help", "circle-help", "Help & getting started")}<span class="avatar">Y</span></div></aside>
 <div class="shell"><header class="topbar hud"><div class="wordmark">FlipVault <span>PRO</span></div><div class="breadcrumb"><span>My library</span>${icon("chevron-right")}<strong id="bookTitle">Opening your reading room…</strong></div><div class="top-actions"><button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a PDF", "import-btn")}</div></header>
 <main><div class="workspace-header hud"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1></div><button id="focus" class="subtle">${icon("maximize")}<span>Focus mode</span></button></div>
-<div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("hand", "hand", "Read & turn pages", "active")}${btn("marker", "highlighter", "Highlight studio")}${btn("eraser", "eraser", "Eraser studio")}${btn("addClip", "paperclip", "Attach a paperclip")}<span class="divider"></span>${btn("undo", "undo-2", "Undo · Ctrl+Z")}${btn("redo", "redo-2", "Redo · Ctrl+Y")}</div><div class="toolbar-group zoom-group">${btn("zoomOut", "minus", "Zoom out")}<button id="zoomValue" class="zoom-value">100%</button>${btn("zoomIn", "plus", "Zoom in")}<span class="divider"></span>${btn("more", "ellipsis", "More reading tools")}</div></div>
+<div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("hand", "hand", "Read & turn pages", "active")}${btn("marker", "highlighter", "Highlight studio")}${btn("eraser", "eraser", "Eraser studio")}${btn("addClip", "paperclip", "Attach a paperclip")}<span class="divider"></span>${btn("undo", "undo-2", "Undo last highlight")}${btn("redo", "redo-2", "Redo last undone highlight")}</div><div class="toolbar-group zoom-group">${btn("zoomOut", "minus", "Zoom out")}<button id="zoomValue" class="zoom-value">100%</button>${btn("zoomIn", "plus", "Zoom in")}<span class="divider"></span>${btn("more", "ellipsis", "More reading tools")}</div></div>
 <div id="studio" class="studio hud" hidden></div>
 <section id="stage" class="stage" aria-label="Interactive PDF reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><canvas id="leftInk" class="annotation"></canvas><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><canvas id="highlightCanvas" class="annotation"></canvas><div id="uiLayer" class="page-ui"></div><div id="brushCursor"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
 <footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination">${btn("first", "chevrons-left", "First page")}${btn("prevSmall", "chevron-left", "Previous page")}<label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label>${btn("nextSmall", "chevron-right", "Next page")}${btn("last", "chevrons-right", "Last page")}</div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
-</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><div id="toast" class="toast" role="status" hidden></div><input id="pdfFile" type="file" accept="application/pdf,.pdf" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
+</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><button id="focusTools" class="focus-tools-button" aria-label="Open reader tools" aria-expanded="false">${icon("sliders-horizontal")}<span>Reader tools</span></button><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><input id="pdfFile" type="file" accept="application/pdf,.pdf" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
 function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.65 } });
 }
@@ -340,6 +351,11 @@ function fitSize() {
   );
   return { h: Math.max(140, h), w: Math.max(140, h) * aspect };
 }
+function cached(n, scaleBoost = zoom) {
+  const target = Math.min(2, devicePixelRatio || 1) * Math.min(scaleBoost, 3);
+  const entry = cache.get(n);
+  return !!entry && entry.res >= target;
+}
 async function getPageCanvas(n, scaleBoost = zoom) {
   if (n < 1 || n > pdf.numPages) return null;
   const target = Math.min(2, devicePixelRatio || 1) * Math.min(scaleBoost, 3),
@@ -422,7 +438,9 @@ async function composite(n) {
 async function render() {
   if (!pdf) return;
   const token = ++renderToken;
-  $("#loading").hidden = false;
+  // Only dim the stage when a page actually has to be rasterised; turning to
+  // an already rendered page must not flash the loading veil.
+  if (!cached(page)) $("#loading").hidden = false;
   const entry = await getPageCanvas(page);
   if (token !== renderToken) return;
   const spread = isSpread();
@@ -515,8 +533,12 @@ async function turn(dir) {
   try {
     const current = await composite(page),
       next = await composite(page + dir);
-    curl.begin(current, next, current.height * 0.88, rtl ? dir > 0 : dir < 0);
-    curl.p = { x: current.width * 0.8, y: current.height * 0.86 };
+    const reverse = rtl ? dir > 0 : dir < 0;
+    curl.begin(current, next, current.height * 0.88, reverse);
+    curl.p = {
+      x: reverse ? current.width * 0.2 : current.width * 0.8,
+      y: current.height * 0.86,
+    };
     curl.draw();
     pageAudio.play();
     curl.release(true, () => {
@@ -731,8 +753,12 @@ function showStudio() {
   el.insertAdjacentHTML(
     "beforeend",
     btn("studioUndo", "undo-2", "Undo stroke") +
-      btn("studioRedo", "redo-2", "Redo stroke"),
+      btn("studioRedo", "redo-2", "Redo stroke") +
+      btn("minimizeStudio", "minus", "Minimize tool options"),
   );
+  $("#minimizeStudio").onclick = () => {
+    el.hidden = true;
+  };
   $("#studioUndo").onclick = () => ann.undo();
   $("#studioRedo").onclick = () => ann.redo();
   refreshIcons();
@@ -745,9 +771,18 @@ function showStudio() {
 }
 function dialog(title, body, actions = "") {
   const d = $("#dialog");
-  d.innerHTML = `<div class="dialog-head"><div><span class="eyebrow">FLIPVAULT PRO</span><h2>${title}</h2></div><button id="closeDialog" class="icon-btn" aria-label="Close dialog">${icon("x")}</button></div><div class="dialog-body">${body}</div>${actions ? `<div class="dialog-actions">${actions}</div>` : ""}`;
+  $("#resumeDialog").hidden = true;
+  if (d.open) d.close();
+  d.innerHTML = `<div class="dialog-head"><div><span class="eyebrow">FLIPVAULT PRO</span><h2>${title}</h2></div><div class="dialog-window-actions"><button id="minimizeDialog" class="icon-btn" aria-label="Minimize dialog" title="Minimize">${icon("minus")}</button><button id="closeDialog" class="icon-btn" aria-label="Close dialog" title="Close">${icon("x")}</button></div></div><div class="dialog-body">${body}</div>${actions ? `<div class="dialog-actions">${actions}</div>` : ""}`;
   d.showModal();
-  $("#closeDialog").onclick = () => d.close();
+  $("#closeDialog").onclick = () => {
+    $("#resumeDialog").hidden = true;
+    d.close();
+  };
+  $("#minimizeDialog").onclick = () => {
+    d.close();
+    $("#resumeDialog").hidden = false;
+  };
   refreshIcons();
   return d;
 }
@@ -830,15 +865,22 @@ function editClip(clip) {
 }
 function openDrawer(title, subtitle, body) {
   $("#drawer").innerHTML =
-    `<div class="drawer-head"><div><span class="eyebrow">YOUR PERSONAL SPACE</span><h2>${title}</h2><p>${subtitle}</p></div>${btn("closeDrawer", "x", "Close panel")}</div><div class="drawer-content">${body}</div>`;
+    `<div class="drawer-head"><div><span class="eyebrow">YOUR PERSONAL SPACE</span><h2>${title}</h2><p>${subtitle}</p></div><div class="drawer-actions"><button id="minimizeDrawer" class="icon-btn" aria-label="Minimize panel">${icon("minus")}</button>${btn("closeDrawer", "x", "Close panel")}</div></div><div class="drawer-content">${body}</div>`;
   $("#drawer").hidden = false;
   $("#drawerBackdrop").hidden = false;
+  $("#resumeDrawer").hidden = true;
   $("#closeDrawer").onclick = closeDrawer;
+  $("#minimizeDrawer").onclick = () => {
+    $("#drawer").hidden = true;
+    $("#drawerBackdrop").hidden = true;
+    $("#resumeDrawer").hidden = false;
+  };
   refreshIcons();
 }
 function closeDrawer() {
   $("#drawer").hidden = true;
   $("#drawerBackdrop").hidden = true;
+  $("#resumeDrawer").hidden = true;
   searchToken++;
 }
 async function showLibrary() {
@@ -977,9 +1019,14 @@ function toggleMenu(id, show) {
 }
 function popover(anchor, html) {
   const p = $("#popover");
-  p.innerHTML = html;
+  p.innerHTML = `<div class="popover-window-actions"><button id="minimizePopover" class="icon-btn" aria-label="Minimize menu" title="Minimize menu">${icon("minus")}</button></div>${html}`;
   p.hidden = false;
   const r = anchor.getBoundingClientRect();
+  $("#minimizePopover").onclick = () => {
+    p.hidden = true;
+    $("#resumePopover").hidden = false;
+  };
+  $("#resumePopover").hidden = true;
   p.style.top =
     Math.max(12, Math.min(r.bottom + 10, innerHeight - p.offsetHeight - 12)) +
     "px";
@@ -1287,7 +1334,7 @@ async function showReference(n) {
   const entry = await getPageCanvas(referencePage, 1);
   $("#reference").hidden = false;
   $("#reference").innerHTML =
-    `<div class="reference-head">${icon("panels-left-bottom")}<strong>Keep in view</strong><button id="refPrev" class="icon-btn" aria-label="Previous reference page">${icon("chevron-left")}</button><input id="refInput" aria-label="Reference page" type="number" min="1" max="${pdf.numPages}" value="${referencePage}"><button id="refNext" class="icon-btn" aria-label="Next reference page">${icon("chevron-right")}</button>${btn("closeReference", "x", "Close reference")}</div><canvas id="referenceCanvas"></canvas>`;
+    `<div class="reference-head">${icon("panels-left-bottom")}<strong>Keep in view</strong><button id="refPrev" class="icon-btn" aria-label="Previous reference page">${icon("chevron-left")}</button><input id="refInput" aria-label="Reference page" type="number" min="1" max="${pdf.numPages}" value="${referencePage}"><button id="refNext" class="icon-btn" aria-label="Next reference page">${icon("chevron-right")}</button><button id="minimizeReference" class="icon-btn" aria-label="Minimize reference">${icon("minus")}</button>${btn("closeReference", "x", "Close reference")}</div><canvas id="referenceCanvas"></canvas>`;
   const c = $("#referenceCanvas");
   c.width = entry.canvas.width;
   c.height = entry.canvas.height;
@@ -1295,7 +1342,15 @@ async function showReference(n) {
   $("#refPrev").onclick = () => showReference(referencePage - 1);
   $("#refNext").onclick = () => showReference(referencePage + 1);
   $("#refInput").onchange = (e) => showReference(+e.target.value);
-  $("#closeReference").onclick = () => ($("#reference").hidden = true);
+  $("#closeReference").onclick = () => {
+    $("#reference").hidden = true;
+    $("#resumeReference").hidden = true;
+  };
+  $("#minimizeReference").onclick = () => {
+    $("#reference").hidden = true;
+    $("#resumeReference").hidden = false;
+  };
+  $("#resumeReference").hidden = true;
   refreshIcons();
 }
 function updateReadingStats() {
@@ -1320,7 +1375,7 @@ function updateReadingStats() {
 function showMore() {
   popover(
     $("#more"),
-    `<span class="menu-label">A LITTLE MORE POSSIBILITY</span><button id="referenceTool" class="menu-item">${icon("panels-left-bottom")}Reference split view</button><button id="focusTimer" class="menu-item">${icon("timer")}${focusEnd ? "Stop focus timer" : "20-minute reading ritual"}</button><button id="fullscreenTool" class="menu-item">${icon("expand")}Fullscreen</button><button id="installApp" class="menu-item">${icon("smartphone")}Install on your device</button><button id="shortcutsTool" class="menu-item">${icon("keyboard")}Shortcuts & gestures</button>`,
+    `<span class="menu-label">A LITTLE MORE POSSIBILITY</span><button id="referenceTool" class="menu-item">${icon("panels-left-bottom")}Reference split view</button><button id="focusTimer" class="menu-item">${icon("timer")}${focusEnd ? "Stop focus timer" : "20-minute reading ritual"}</button><button id="fullscreenTool" class="menu-item">${icon("expand")}Fullscreen</button><button id="installApp" class="menu-item">${icon("smartphone")}Install on your device</button><button id="guideTool" class="menu-item">${icon("circle-help")}Getting started & gestures</button><button id="tutorialTool" class="menu-item">${icon("book-open-check")}Replay the guided tour</button>`,
   );
   $("#referenceTool").onclick = () => {
     $("#popover").hidden = true;
@@ -1350,27 +1405,119 @@ function showMore() {
         "Android: open your browser menu → Add to home screen → Install app.",
       );
   };
-  $("#shortcutsTool").onclick = showHelp;
+  $("#guideTool").onclick = showHelp;
+  $("#tutorialTool").onclick = () => showTutorial(0);
+}
+const tutorialSteps = [
+  {
+    title: "Welcome to FlipVault Pro.",
+    eyebrow: "1 OF 3 · YOUR READING ROOM",
+    text: "Your books stay on this device. Move through a book with the side arrows, by tapping a page thumbnail, or by holding and dragging anywhere on the page.",
+    visual: "book-open",
+  },
+  {
+    title: "Make a page yours.",
+    eyebrow: "2 OF 3 · MARK & REMEMBER",
+    text: "Choose Marker to underline a passage, Eraser to remove ink, or the paperclip to bookmark a page and add a note. Your marks never alter the original PDF.",
+    visual: "highlighter",
+  },
+  {
+    title: "Settle in your way.",
+    eyebrow: "3 OF 3 · PERSONALISE",
+    text: "Pinch to zoom and drag to pan. Choose page layout, paper appearance, and reading background from the toolbar. In focus mode, Reader tools keeps the controls and thumbnails close at hand.",
+    visual: "sliders-horizontal",
+  },
+];
+function showTutorial(step = 0) {
+  step = Math.max(0, Math.min(tutorialSteps.length - 1, step));
+  const item = tutorialSteps[step];
+  const actions = `<button id="tutorialSkip" class="secondary">${step === tutorialSteps.length - 1 ? "Finish" : "Skip tour"}</button><span class="tutorial-spacer"></span>${step ? '<button id="tutorialBack" class="secondary">Back</button>' : ""}<button id="tutorialNext" class="primary">${step === tutorialSteps.length - 1 ? "Start reading" : "Next"}</button>`;
+  const d = dialog(
+    item.title,
+    `<div class="tutorial-card"><span class="tutorial-eyebrow">${item.eyebrow}</span><div class="tutorial-illustration">${icon(item.visual)}</div><p>${item.text}</p><div class="tutorial-dots" aria-label="Step ${step + 1} of ${tutorialSteps.length}">${tutorialSteps.map((_, i) => `<span class="${i === step ? "active" : ""}"></span>`).join("")}</div></div>`,
+    actions,
+  );
+  const finish = () => {
+    d.close();
+    store.put("settings", true, "tutorialSeen").catch(fail);
+  };
+  $("#tutorialSkip").onclick = finish;
+  $("#tutorialNext").onclick = () =>
+    step === tutorialSteps.length - 1 ? finish() : showTutorial(step + 1);
+  if (step) $("#tutorialBack").onclick = () => showTutorial(step - 1);
+}
+function updateFocusFilmstrip() {
+  const on = document.body.classList.contains("focus-filmstrip");
+  const control = $("#focusFilmstrip");
+  if (control) control.setAttribute("aria-pressed", String(on));
+  $("#filmToggle").classList.toggle("active", on || !$("#filmstrip").hidden);
+}
+function showFocusTools() {
+  const panel = $("#focusPanel"),
+    button = $("#focusTools");
+  panel.innerHTML = `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Minimize reader tools">${icon("minus")}</button></div><div class="focus-tools-grid"><button data-focus="hand">${icon("hand")}<span>Read</span></button><button data-focus="marker">${icon("highlighter")}<span>Marker</span></button><button data-focus="eraser">${icon("eraser")}<span>Eraser</span></button><button data-focus="bookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="focusFilmstrip" aria-pressed="${document.body.classList.contains("focus-filmstrip")}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button data-focus="zoom-out">${icon("minus")}<span>Zoom out</span></button><button data-focus="zoom-in">${icon("plus")}<span>Zoom in</span></button><button data-focus="sound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button data-focus="search">${icon("search")}<span>Search book</span></button><button data-focus="more">${icon("ellipsis")}<span>More options</span></button><button data-focus="tutorial">${icon("circle-help")}<span>App guide</span></button></div>`;
+  panel.hidden = false;
+  button.setAttribute("aria-expanded", "true");
+  $("#minimizeFocusTools").onclick = () => {
+    panel.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  };
+  panel.querySelectorAll("[data-focus]").forEach((el) => {
+    el.onclick = run(async () => {
+      switch (el.dataset.focus) {
+        case "hand":
+          setTool("hand");
+          break;
+        case "marker":
+          setTool("marker");
+          break;
+        case "eraser":
+          setTool("eraser");
+          break;
+        case "bookmark":
+          editClip();
+          break;
+        case "zoom-in":
+          await setZoom(zoom + 0.25);
+          break;
+        case "zoom-out":
+          await setZoom(zoom - 0.25);
+          break;
+        case "sound":
+          $("#sound").click();
+          break;
+        case "search":
+          showSearch();
+          break;
+        case "more":
+          panel.hidden = true;
+          button.setAttribute("aria-expanded", "false");
+          showMore();
+          break;
+        case "tutorial":
+          panel.hidden = true;
+          button.setAttribute("aria-expanded", "false");
+          showHelp();
+          break;
+      }
+    });
+  });
+  $("#focusFilmstrip").onclick = () => {
+    const on = !document.body.classList.contains("focus-filmstrip");
+    document.body.classList.toggle("focus-filmstrip", on);
+    $("#filmstrip").hidden = !on;
+    updateFocusFilmstrip();
+  };
+  refreshIcons();
 }
 function showHelp() {
   $("#popover").hidden = true;
   dialog(
-    "A few quiet shortcuts.",
-    `<div class="shortcut-grid">${[
-      ["← / →", "Turn a page"],
-      ["H", "Highlight marker"],
-      ["V", "Read & drag anywhere"],
-      ["E", "Precision / stroke eraser"],
-      ["Ctrl + Z / Y", "Undo / redo this page"],
-      ["Ctrl + F", "Search this book"],
-      ["+ / −", "Zoom in / out"],
-      ["Escape", "Close panels & focus mode"],
-    ]
-      .map(([key, desc]) => `<kbd>${key}</kbd><span>${desc}</span>`)
-      .join(
-        "",
-      )}</div><h3>Made for your fingertips.</h3><p>In Read mode, hold and drag anywhere on either page: drag left for the next page, right for the previous (reversed in Manga mode). A horizontal movement starts the peel; simply holding still does not turn a page. Short drags spring back. Edge and corner peels still work. Pinch to zoom, double-tap to enlarge, and drag to pan when zoomed.</p><p>With a marker active, one finger draws. Tap the thin outer edge or swipe with two fingers to turn pages. Pause a marker for 350ms to straighten it. Paperclips slide along their page edge.</p><div class="info-note">For best performance on phones, use single-page mode. FlipVault limits render resolution and keeps only five nearby high-resolution pages in memory.</div>`,
+    "Made for your fingertips.",
+    `<p>Turn pages by tapping the side arrows, tapping a thumbnail, or holding and dragging anywhere on the page. Drag left for the next page; drag right for the previous page. Manga mode reverses the direction.</p><div class="gesture-guide"><article><span>${icon("move-horizontal")}</span><strong>Turn a page</strong><small>Hold, then swipe across the paper.</small></article><article><span>${icon("hand")}</span><strong>Zoom & move</strong><small>Pinch to zoom; drag to pan. Double-tap to enlarge.</small></article><article><span>${icon("highlighter")}</span><strong>Mark a passage</strong><small>Choose Marker, then draw with one finger.</small></article><article><span>${icon("paperclip")}</span><strong>Save a thought</strong><small>Add a page clip to bookmark it and attach a note.</small></article></div><div class="info-note">In focus mode, tap Reader tools for the marker, eraser, page clips, thumbnails, and more—without leaving the page.</div>`,
+    `<button id="replayTutorial" class="secondary">Start the guided tour</button>`,
   );
+  $("#replayTutorial").onclick = () => showTutorial(0);
 }
 const pointers = new Map();
 let lastTap = 0,
@@ -1396,10 +1543,7 @@ function curlPoint(e) {
       gesture.reverse,
     );
   return {
-    x:
-      (gesture.reverse
-        ? 1 - (e.clientX - r.left) / r.width
-        : (e.clientX - r.left) / r.width) * w,
+    x: ((e.clientX - r.left) / r.width) * w,
     y: ((e.clientY - r.top) / r.height) * curl.h,
   };
 }
@@ -1689,11 +1833,42 @@ $("#bookViewport").addEventListener(
   },
   { passive: false },
 );
-on("exitFocus", () => {
-  document.body.classList.remove("focus-mode");
+function leaveFocusMode() {
+  document.body.classList.remove("focus-mode", "focus-filmstrip");
+  fullscreen = false;
+  $("#focusPanel").hidden = true;
+  $("#focusTools").setAttribute("aria-expanded", "false");
+  $("#filmstrip").hidden = false;
+  $("#focus").innerHTML = icon("maximize") + "<span>Focus mode</span>";
+  refreshIcons();
   cache.clear();
-  render();
-});
+  render().catch(fail);
+}
+on("exitFocus", leaveFocusMode);
+$("#resumeDialog").onclick = () => {
+  $("#resumeDialog").hidden = true;
+  $("#dialog").showModal();
+};
+$("#resumeDrawer").onclick = () => {
+  $("#resumeDrawer").hidden = true;
+  $("#drawer").hidden = false;
+  $("#drawerBackdrop").hidden = false;
+};
+$("#resumePopover").onclick = () => {
+  $("#resumePopover").hidden = true;
+  $("#popover").hidden = false;
+};
+$("#resumeReference").onclick = () => {
+  $("#resumeReference").hidden = true;
+  $("#reference").hidden = false;
+};
+$("#focusTools").onclick = () => {
+  if ($("#focusPanel").hidden) showFocusTools();
+  else {
+    $("#focusPanel").hidden = true;
+    $("#focusTools").setAttribute("aria-expanded", "false");
+  }
+};
 on("library", showLibrary);
 on("reader", closeDrawer);
 on("clips", showClips);
@@ -1729,11 +1904,13 @@ on("sound", async () => {
   toast(muted ? "Page sounds off." : "Recorded page sounds on.");
 });
 on("focus", () => {
-  document.body.classList.toggle("focus-mode");
-  fullscreen = document.body.classList.contains("focus-mode");
-  $("#focus").innerHTML =
-    icon(fullscreen ? "minimize" : "maximize") +
-    `<span>${fullscreen ? "Exit focus" : "Focus mode"}</span>`;
+  fullscreen = !document.body.classList.contains("focus-mode");
+  if (fullscreen) {
+    document.body.classList.add("focus-mode");
+    $("#focus").innerHTML = icon("minimize") + "<span>Exit focus</span>";
+    $("#focusPanel").hidden = true;
+    $("#focusTools").setAttribute("aria-expanded", "false");
+  } else leaveFocusMode();
   refreshIcons();
   setTimeout(() => {
     cache.clear();
@@ -1742,7 +1919,9 @@ on("focus", () => {
 });
 on("filmToggle", () => {
   $("#filmstrip").hidden = !$("#filmstrip").hidden;
-  $("#filmToggle").classList.toggle("active");
+  if (document.body.classList.contains("focus-mode"))
+    document.body.classList.toggle("focus-filmstrip", !$("#filmstrip").hidden);
+  $("#filmToggle").classList.toggle("active", !$("#filmstrip").hidden);
   setTimeout(() => {
     cache.clear();
     render().catch(fail);
@@ -1766,15 +1945,21 @@ $("#vaultFile").onchange = run(async (e) => {
   e.target.value = "";
 });
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("#popover,#theme,#layout,#more,#export"))
+  if (
+    !e.target.closest("#popover,#theme,#layout,#more,#export,#resumePopover")
+  ) {
     $("#popover").hidden = true;
+    $("#resumePopover").hidden = true;
+  }
 });
 document.addEventListener("keydown", (e) => {
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (e.key === "Escape") {
+    if ($("#dialog").open) return;
     closeDrawer();
     $("#popover").hidden = true;
-    document.body.classList.remove("focus-mode");
+    $("#resumePopover").hidden = true;
+    if (document.body.classList.contains("focus-mode")) leaveFocusMode();
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
@@ -1888,6 +2073,7 @@ async function init() {
     navigator.serviceWorker
       .register(import.meta.env.BASE_URL + "sw.js")
       .catch(() => {});
+  if (!(await store.get("settings", "tutorialSeen"))) showTutorial(0);
 }
 init().catch(fail);
 

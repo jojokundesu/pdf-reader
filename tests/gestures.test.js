@@ -45,11 +45,23 @@ test("middle-page fold begins at the edge and follows relative movement in eithe
       800,
       400,
       start,
+      { clientX: 180, clientY: 300 },
+      rect,
+      true,
+    ),
+    { x: 0, y: 400 },
+  );
+  assert.deepEqual(
+    interiorFoldPoint(
+      600,
+      800,
+      400,
+      start,
       { clientX: 240, clientY: 320 },
       rect,
       true,
     ),
-    { x: 480, y: 440 },
+    { x: 120, y: 440 },
   );
 });
 test("short held interior drags return; deliberate swipes finish; cancellation always returns", () => {
