@@ -1,8 +1,5 @@
 name: Explicit side-by-side Android preview download
 on:
-  push:
-    branches: [arena/80cef757-pdf-reader]
-    paths: [.github/workflows/side-by-side-preview.yml]
   workflow_dispatch:
 permissions:
   contents: write
@@ -61,5 +58,5 @@ jobs:
           (cd dist && zip -q -r ../FlipVault-Pro-1.2.0-web.zip .)
           gh release create "side-preview-${GITHUB_SHA:0:7}" --target "$GITHUB_SHA" --prerelease \
             --title "FlipVault Pro 1.2.0 · Separate preview with recorded page sound" \
-            --notes "Explicitly requested temporary preview. Installs as FlipVault Preview (com.flipvault.pro.preview), alongside the existing FlipVault Pro app. Includes the exact user-supplied page-turn recording, pure-black background and anywhere-drag turns. It does not replace the old app or automatically share its books/notes: import a vault backup and original PDFs if needed. This APK uses a temporary debug key and is NOT a permanent in-place update channel. Main-app signed release safeguards remain unchanged. See docs/android-signing.md for permanent signing setup. Physical-device playback/install testing remains outstanding." \
+            --notes "Optional side-by-side test build. Installs as FlipVault Preview (com.flipvault.pro.preview) next to the main FlipVault Pro app, with its own books and notes; import a vault backup and the original PDFs if you want them there. It uses a temporary debug signing key, so it is not an update channel for the main app. The main release is published by the Verify app & publish signed Android release workflow. Physical-device install testing remains outstanding." \
             FlipVault-Pro-1.2.0-side-by-side-preview.apk FlipVault-Pro-1.2.0-web.zip

@@ -49,7 +49,7 @@ function remoteConfiguration() {
     };
   } catch {
     throw Error(
-      "This terminal cannot administer the repository Actions settings. Use --generate-only, then enter the generated files directly in GitHub Settings. Never send signing material in chat.",
+      "This terminal cannot administer the repository Actions settings. Use --generate-only, then enter the generated files directly in GitHub Settings. Never commit signing material or post it publicly.",
     );
   }
 }
@@ -192,7 +192,7 @@ function restoreBackup(directory) {
 export function runSetup(options) {
   if (options.mode === "help") {
     console.log(
-      "Run this yourself in a PRIVATE GitHub Codespace or trusted computer, never in a public CI job.\nnode scripts/setup-android-signing.mjs                 Generate once and provision GitHub using your existing gh login\nnode scripts/setup-android-signing.mjs --generate-only  Create private files for manual GitHub Settings entry\nnode scripts/setup-android-signing.mjs --resume FOLDER  Reuse the saved key after interrupted setup\nBackups contain private credentials. Keep an encrypted offline copy; never share them in chat or commit them.",
+      "Creates a private release signing key. Run this in a PRIVATE GitHub Codespace or on a trusted computer, never in a public CI job.\nnode scripts/setup-android-signing.mjs                 Generate once and provision GitHub using your existing gh login\nnode scripts/setup-android-signing.mjs --generate-only  Create private files for manual GitHub Settings entry\nnode scripts/setup-android-signing.mjs --resume FOLDER  Reuse the saved key after interrupted setup\nBackups contain private credentials. Keep an encrypted offline copy; never commit or publish them. See docs/android-signing.md.",
     );
     return;
   }
@@ -251,7 +251,7 @@ export function runSetup(options) {
     );
   }
   console.log(
-    "Persistent signing settings provisioned. Save your private backup, then run the main release workflow on arena/80cef757-pdf-reader. This is a NEW key: it cannot update old temporary-key installs in place.",
+    "Persistent signing settings provisioned. Save your private backup, then run the main release workflow on main. This is a NEW key: it cannot update old temporary-key installs in place.",
   );
 }
 if (
