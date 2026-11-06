@@ -34,15 +34,20 @@ test("reflection is involutory and maps anchor to pointer", () => {
   const rr = reflect(r);
   assert.ok(Math.hypot(rr.x - c.x, rr.y - c.y) < 1e-8);
 });
-test("spine constraints do not stretch paper for any anchor", () => {
-  for (const y of [0, 100, 200])
-    for (const p of [
-      { x: 500, y: 500 },
-      { x: -500, y: -500 },
-      { x: 50, y: 100 },
-    ]) {
-      const q = clampPoint(p, 100, 200, y);
-      assert.ok(Math.hypot(q.x, q.y) <= Math.hypot(100, y) + 1e-5);
-      assert.ok(Math.hypot(q.x, q.y - 200) <= Math.hypot(100, 200 - y) + 1e-5);
-    }
+test("spine constraints do not stretch paper in either fold direction", () => {
+  for (const reverse of [false, true])
+    for (const y of [0, 100, 200])
+      for (const p of [
+        { x: 500, y: 500 },
+        { x: -500, y: -500 },
+        { x: 50, y: 100 },
+      ]) {
+        const q = clampPoint(p, 100, 200, y, reverse);
+        const spineX = reverse ? 100 : 0;
+        assert.ok(Math.hypot(q.x - spineX, q.y) <= Math.hypot(100, y) + 1e-5);
+        assert.ok(
+          Math.hypot(q.x - spineX, q.y - 200) <=
+            Math.hypot(100, 200 - y) + 1e-5,
+        );
+      }
 });

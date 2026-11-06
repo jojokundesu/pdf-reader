@@ -18,14 +18,16 @@ export class PageCurl {
     this.canvas.width = this.w * 2;
     this.canvas.height = this.h;
     this.canvas.style.display = "block";
-    this.c = { x: this.w, y: anchorY };
-    this.p = { x: this.w - 0.5, y: anchorY };
-    this.reverse = reverse;
+    this.reverse = !!reverse;
+    // The sheet is anchored at the outer edge it lifts from: the right edge
+    // for a forward fold, the left edge for a backward fold.
+    this.c = { x: this.reverse ? 0 : this.w, y: anchorY };
+    this.p = { x: this.reverse ? 0.5 : this.w - 0.5, y: anchorY };
     this.running = true;
     this.draw();
   }
   move(p) {
-    this.p = clampPoint(p, this.w, this.h, this.c.y);
+    this.p = clampPoint(p, this.w, this.h, this.c.y, this.reverse);
     if (!this.drawFrame)
       this.drawFrame = requestAnimationFrame(() => {
         this.drawFrame = 0;
@@ -50,19 +52,10 @@ export class PageCurl {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w * 2, h);
     ctx.save();
-    if (this.reverse) {
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-    } else ctx.translate(w, 0);
-    const drawPage = (source) => {
-      if (this.reverse) {
-        ctx.save();
-        ctx.translate(w, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(source, 0, 0, w, h);
-        ctx.restore();
-      } else ctx.drawImage(source, 0, 0, w, h);
-    };
+    // Both fold directions are drawn over the book surface; only the fold
+    // geometry differs, so the revealed page is never mirrored.
+    ctx.translate(w, 0);
+    const drawPage = (source) => ctx.drawImage(source, 0, 0, w, h);
     const f = foldGeometry(w, h, this.c, this.p);
     ctx.save();
     pathPolygon(ctx, f.unpeeled);
@@ -89,7 +82,7 @@ export class PageCurl {
     pathPolygon(ctx, f.reflected);
     ctx.shadowColor = "rgba(0,0,0,.33)";
     ctx.shadowBlur = w * 0.025;
-    ctx.shadowOffsetX = -w * 0.012;
+    ctx.shadowOffsetX = (this.reverse ? w : -w) * 0.012;
     ctx.fillStyle = "#fdfbf7";
     ctx.fill();
     ctx.restore();
@@ -100,7 +93,9 @@ export class PageCurl {
     ctx.fillRect(-w, -h, w * 3, h * 3);
     ctx.save();
     ctx.transform(...f.matrix);
-    ctx.globalAlpha = 0.72;
+    // The back of the lifted sheet is opaque paper: no ghost of the page
+    // underneath may bleed through while the fold is in motion.
+    ctx.globalAlpha = 1;
     drawPage(this.current);
     ctx.restore();
     const width = Math.max(1, f.len * 0.5);
@@ -124,7 +119,16 @@ export class PageCurl {
   release(complete, onfinish) {
     cancelAnimationFrame(this.drawFrame);
     this.drawFrame = 0;
-    const dest = { x: complete ? -this.w : this.w, y: this.c.y };
+    const dest = {
+      x: complete
+        ? this.reverse
+          ? this.w * 2
+          : -this.w
+        : this.reverse
+          ? 0
+          : this.w,
+      y: this.c.y,
+    };
     let vx = 0,
       vy = 0,
       last = performance.now();

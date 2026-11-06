@@ -38,12 +38,13 @@ export function foldGeometry(w, h, c, p) {
   }));
   return { mid, n, len, peeled, unpeeled, reflected, matrix };
 }
-export function clampPoint(p, w, h, anchorY) {
+export function clampPoint(p, w, h, anchorY, reverse = false) {
   // The anchor's distances to each spine endpoint define the unstretched sheet.
   const q = { ...p };
+  const edge = reverse ? w : 0;
   const circles = [
-    { x: 0, y: 0, r: Math.hypot(w, anchorY) },
-    { x: 0, y: h, r: Math.hypot(w, h - anchorY) },
+    { x: edge, y: 0, r: Math.hypot(w, anchorY) },
+    { x: edge, y: h, r: Math.hypot(w, h - anchorY) },
   ];
   for (let k = 0; k < 4; k++)
     for (const c of circles) {

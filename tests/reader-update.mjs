@@ -18,6 +18,41 @@ const ready = () =>
       document.querySelector("#loading").hidden,
   );
 const num = () => p.locator("#pageInput").inputValue();
+async function dismissFirstRunTutorial() {
+  await p.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return true;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+    if (!db) return false;
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+      request.onerror = () => resolve(false);
+    });
+  });
+  if (await p.locator("#tutorialSkip").isVisible())
+    await p.locator("#tutorialSkip").click();
+  await p.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return false;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+    });
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+    });
+  });
+}
 async function waitPage(n) {
   await p.waitForFunction(
     (n) =>
@@ -63,17 +98,20 @@ async function drag({
   await touch(cancel ? "touchCancel" : "touchEnd", []);
 }
 async function backgroundChoice(id) {
-  await p.locator("#theme").click();
+  if (await p.locator("#popover").isHidden()) await p.locator("#theme").click();
   await p.locator(`button[data-background="${id}"]`).click();
   await p.waitForFunction(
     (id) => document.documentElement.dataset.background === id,
     id,
   );
-  await p.locator("#theme").click();
+  await p
+    .locator(`button[data-background="${id}"]`)
+    .waitFor({ state: "visible" });
 }
 try {
   await p.goto(process.env.TEST_URL || "http://localhost:5173");
   await ready();
+  await dismissFirstRunTutorial();
   const black = () =>
     p.locator("#stage").evaluate((el) => getComputedStyle(el).backgroundColor);
   assert.equal(await black(), "rgb(0, 0, 0)");
@@ -108,7 +146,6 @@ try {
   await ready();
   assert.equal(await black(), "rgb(41, 35, 30)");
   await backgroundChoice("black");
-  await p.locator("#theme").click();
   await p.locator('button[data-theme="sepia"]').click();
   assert.equal(await black(), "rgb(0, 0, 0)");
   await p.locator("#theme").click();

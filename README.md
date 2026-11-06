@@ -4,11 +4,11 @@ An offline PDF reader for Android, with real canvas page folds, non-destructive 
 
 **[Download for Android](https://github.com/jojokundesu/pdf-reader/releases/latest/download/FlipVault-Pro-Android.apk)** — free APK, no account, works offline after install.
 
-| Platform | Status |
-| --- | --- |
-| Android phones | **Available now** — download the APK above |
-| iPhone / iOS | Coming soon |
-| Windows, macOS, Linux desktop | Coming soon |
+| Platform                      | Status                                     |
+| ----------------------------- | ------------------------------------------ |
+| Android phones                | **Available now** — download the APK above |
+| iPhone / iOS                  | Coming soon                                |
+| Windows, macOS, Linux desktop | Coming soon                                |
 
 Install the APK, open the app, and tap **+** to add your PDFs. Updates install over the existing app and keep your books, notes and reading positions — no uninstall needed.
 
@@ -18,7 +18,7 @@ Install the APK, open the app, and tap **+** to add your PDFs. Updates install o
 - **Mark up without damaging the file.** Six marker colours, adjustable brush size and opacity, straight-line mode, precision and whole-stroke erasers, and per-page undo/redo.
 - **Paperclip bookmarks** with notes, full-book bookmark tabs and a notes drawer.
 - **Full-text search** with snippets, plus a thumbnail filmstrip that flags annotated pages.
-- **Focus mode** with an idle-hiding toolbar, reading-time estimates, a 20-minute reading ritual and a floating reference view.
+- **Focus mode** with an always-visible reader toolbar, a touch-friendly tools panel for markers, erasers, bookmarks, zoom and sound, plus optional page thumbnails. A first-use guided tour can be replayed any time from Help. Reading-time estimates, a 20-minute reading ritual and a floating reference view are included.
 - **Pure black background** by default, with charcoal, forest and warm-brown alternatives, plus paper, sepia, AMOLED and e-ink page themes.
 - **Your data stays yours:** no account, no analytics, no cloud sync, no network requests. Export annotated PDFs or a printable study summary, and back up notes and positions to a `.flipvault.json` vault.
 
