@@ -94,7 +94,7 @@ jobs:
         if: steps.signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: FlipVault-Pro-Android-signed-${{ github.ref_name }}
+          name: FlipVault-Pro-Android-signed-review
           path: android/app/build/outputs/apk/release/app-release.apk
       - name: Upload unsigned verification artifact (not installable)
         if: steps.signing.outputs.configured != 'true'

@@ -76,9 +76,7 @@ test("main-app CI publishes only the certificate-verified release APK, never dis
   );
   assert.ok(workflow.includes("app-release.apk"));
   assert.ok(workflow.includes("branches: [main, arena/9d3bad6a-pdf-reader]"));
-  assert.ok(
-    workflow.includes("FlipVault-Pro-Android-signed-${{ github.ref_name }}"),
-  );
+  assert.ok(workflow.includes("FlipVault-Pro-Android-signed-review"));
   assert.ok(workflow.includes("github.ref == 'refs/heads/main'"));
   assert.ok(!workflow.includes("app-debug.apk"));
   assert.ok(!workflow.includes("assembleDebug :app:assembleDebugAndroidTest"));
