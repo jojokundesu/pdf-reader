@@ -1,7 +1,7 @@
 name: Verify app & publish only persistently signed Android releases
 on:
   push:
-    branches: [main]
+    branches: [main, arena/9d3bad6a-pdf-reader]
   workflow_dispatch:
 permissions:
   contents: read
