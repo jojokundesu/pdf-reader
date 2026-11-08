@@ -75,6 +75,7 @@ test("main-app CI publishes only the certificate-verified release APK, never dis
     workflow.includes("if: steps.signing.outputs.configured == 'true'"),
   );
   assert.ok(workflow.includes("app-release.apk"));
+  assert.ok(workflow.includes("github.ref == 'refs/heads/main'"));
   assert.ok(!workflow.includes("app-debug.apk"));
   assert.ok(!workflow.includes("assembleDebug :app:assembleDebugAndroidTest"));
   assert.ok(

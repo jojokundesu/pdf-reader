@@ -1760,7 +1760,7 @@ textarea {
     height: 17px;
   }
   .zoom-group .icon-btn {
-    width: 24px;
+    width: 22px;
   }
   .zoom-group .zoom-value {
     min-width: 34px;
@@ -2464,5 +2464,115 @@ textarea {
   }
   .focus-mode .focus-tools-panel {
     top: 174px;
+  }
+}
+
+/* Selectable PDF.js text remains inert until the reader explicitly enters selection mode. */
+.text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  transform-origin: 0 0;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.text-layer span,
+.text-layer br {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  transform-origin: 0 0;
+}
+.text-selection .text-layer {
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.text-selection .text-layer span,
+.text-selection .text-layer br {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.text-selection .book-surface {
+  touch-action: pan-x pan-y;
+}
+.text-selection #stage {
+  cursor: text;
+}
+.text-selection ::selection {
+  color: transparent;
+  background: #b5ccff80;
+}
+.selection-actions {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 20px);
+  padding: 7px;
+  color: #ecf0e5;
+  background: #111916f5;
+  border: 1px solid #ffffff24;
+  border-radius: 13px;
+  box-shadow: 0 12px 36px #0009;
+  backdrop-filter: blur(14px);
+  white-space: nowrap;
+}
+.selection-actions[hidden] {
+  display: none;
+}
+.selection-actions span {
+  max-width: min(190px, 34vw);
+  overflow: hidden;
+  color: #b5c2ad;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.selection-actions button {
+  min-height: 34px;
+  padding: 0 11px;
+  color: #eef3e8;
+  background: #ffffff0d;
+  border: 1px solid #ffffff1a;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.selection-actions button:hover {
+  background: #c9dda62b;
+}
+.selection-actions #clearSelection {
+  min-width: 32px;
+  padding: 0;
+  font-size: 20px;
+}
+@media (max-width: 620px) {
+  .selection-actions {
+    gap: 3px;
+    padding: 5px;
+  }
+  .selection-actions span {
+    max-width: 80px;
+    font-size: 10px;
+  }
+  .selection-actions button {
+    padding: 0 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

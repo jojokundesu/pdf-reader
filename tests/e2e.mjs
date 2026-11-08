@@ -47,7 +47,10 @@ const state = () =>
 try {
   await p.goto(url);
   await ready();
-  await p.waitForTimeout(600);
+  await p.waitForFunction(() => document.querySelector("#dialog")?.open, {
+    timeout: 10000,
+  });
+  await p.waitForTimeout(150);
   assert.equal(await p.locator(".thumb").count(), 12);
   assert.equal(await p.locator("#dialog").isVisible(), true);
   assert.match(
@@ -304,6 +307,7 @@ try {
   assert.equal(await p.locator('[data-focus="bookmark"] svg').count(), 1);
   for (const id of [
     "hand",
+    "selectText",
     "marker",
     "eraser",
     "bookmark",
@@ -320,6 +324,7 @@ try {
       `missing focus action ${id}`,
     );
   assert.equal(await p.locator("#focusFilmstrip").count(), 1);
+  assert.equal(await p.locator('[data-focus="selectText"]').count(), 1);
   await p.locator('[data-focus="bookmark"]').click();
   assert.equal(await p.locator("#dialog").isVisible(), true);
   assert.equal(await p.locator("#clipNote").count(), 1);
@@ -328,6 +333,55 @@ try {
   assert.equal(await p.locator("#studio").isVisible(), true);
   await p.locator('[data-focus="eraser"]').click();
   assert.equal(await p.locator("#studio").isVisible(), true);
+  await p.locator('[data-focus="selectText"]').click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#textLayer span").length > 0,
+  );
+  assert.equal(
+    await p.locator("#selectText").getAttribute("aria-pressed"),
+    "true",
+  );
+  const copiedPassage = await p.evaluate(() => {
+    const span = [...document.querySelectorAll("#textLayer span")].find(
+      (node) => node.textContent.trim().length > 3,
+    );
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return selection.toString();
+  });
+  await p.waitForFunction(
+    () => !document.querySelector("#selectionActions").hidden,
+  );
+  assert.ok(copiedPassage.length > 3);
+  await p.evaluate(() => {
+    window.__copiedSelection = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text) => {
+          window.__copiedSelection = text;
+        },
+      },
+    });
+  });
+  await p.locator("#copySelection").click();
+  assert.equal(await p.evaluate(() => window.__copiedSelection), copiedPassage);
+  await p.evaluate(() => {
+    window.__sharedSelection = null;
+    navigator.share = async (payload) => {
+      window.__sharedSelection = payload.text;
+    };
+  });
+  await p.locator("#shareSelection").click();
+  assert.equal(await p.evaluate(() => window.__sharedSelection), copiedPassage);
+  await p.locator('[data-focus="selectText"]').click();
+  assert.equal(
+    await p.locator("#selectText").getAttribute("aria-pressed"),
+    "false",
+  );
   await p.locator("#focusFilmstrip").click();
   assert.equal(
     await p
@@ -342,6 +396,237 @@ try {
   console.log(
     "PASS focus mode offers readable reader tools, page thumbnails and accessible exit",
   );
+
+  const hindiTextBuffer = Buffer.from(
+    "A quiet page\n\nHello from the offline library.\n\nनमस्ते, यह FlipVault की किताब है।\n\nবাংলা বই পড়ুন\n\nதமிழ் புத்தகம்\n\nతెలుగు పుస్తకం",
+    "utf8",
+  );
+  await p.locator("#pdfFile").setInputFiles({
+    name: "hindi-notes.txt",
+    mimeType: "text/plain",
+    buffer: hindiTextBuffer,
+  });
+  await p.waitForFunction(
+    () => document.querySelector("#bookTitle").textContent === "hindi-notes",
+    { timeout: 30000 },
+  );
+  await p.waitForFunction(() => document.querySelector("#loading").hidden);
+  await p.locator("#selectText").click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#textLayer span").length > 0,
+  );
+  const importedText = await p.locator("#textLayer").textContent();
+  assert.match(importedText, /Hello from the offline library/);
+  assert.match(importedText, /नमस्ते/);
+  assert.match(importedText, /বাংলা/);
+  assert.match(importedText, /தமிழ்/);
+  assert.match(importedText, /తెలుగు/);
+  const actualTextSpan = p
+    .locator("#textLayer span")
+    .filter({ hasText: /^Hello$/ })
+    .first();
+  const endTextSpan = p
+    .locator("#textLayer span")
+    .filter({ hasText: /^library\.$/ })
+    .first();
+  const textBox = await actualTextSpan.boundingBox();
+  const endTextBox = await endTextSpan.boundingBox();
+  assert.ok(
+    textBox && textBox.width > 4 && textBox.height > 2,
+    "PDF text spans align over the rendered page",
+  );
+  assert.ok(
+    endTextBox && endTextBox.x + endTextBox.width > textBox.x + textBox.width,
+    "selection layer follows the sentence's reading order",
+  );
+  await p.mouse.move(textBox.x + 1, textBox.y + textBox.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(
+    endTextBox.x + endTextBox.width - 1,
+    endTextBox.y + endTextBox.height / 2,
+    { steps: 10 },
+  );
+  await p.mouse.up();
+  assert.ok(
+    (await p.evaluate(() => window.getSelection().toString())).length > 1,
+    "drag selection returns page text",
+  );
+  await p.locator("#selectText").click();
+  console.log(
+    "PASS reflowed multilingual text and accurate drag-to-select page overlays",
+  );
+
+  const JSZip = (await import("jszip")).default;
+  const epub = new JSZip();
+  epub.file("mimetype", "application/epub+zip", { compression: "STORE" });
+  epub.file(
+    "META-INF/container.xml",
+    '<container><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>',
+  );
+  epub.file(
+    "OPS/book.opf",
+    '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata><dc:title>Offline Garden</dc:title><dc:creator>Test Reader</dc:creator></metadata><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>',
+  );
+  epub.file(
+    "OPS/chapter.xhtml",
+    '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Chapter One</h1><p>Open standards books are read without a network.</p><p>नमस्ते from the garden.</p></body></html>',
+  );
+  const epubBuffer = await epub.generateAsync({ type: "nodebuffer" });
+  await p.locator("#pdfFile").setInputFiles({
+    name: "garden.epub",
+    mimeType: "application/epub+zip",
+    buffer: epubBuffer,
+  });
+  await p.waitForFunction(
+    () => document.querySelector("#bookTitle").textContent === "Offline Garden",
+    { timeout: 30000 },
+  );
+  await p.waitForFunction(() => document.querySelector("#loading").hidden);
+  await p.locator("#selectText").click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#textLayer span").length > 0,
+  );
+  assert.match(
+    await p.locator("#textLayer").textContent(),
+    /Open standards books/,
+  );
+  await p.locator("#selectText").click();
+  console.log(
+    "PASS EPUB container, metadata, reading order and Unicode chapter conversion",
+  );
+  await p.locator("#pdfFile").setInputFiles({
+    name: "notes.html",
+    mimeType: "text/html",
+    buffer: Buffer.from(
+      "<!doctype html><html><body><h2>Local page</h2><p>HTML text is extracted without running scripts.</p><script>window.__unsafeHtmlRan = true</script></body></html>",
+    ),
+  });
+  await p.waitForFunction(
+    () => document.querySelector("#bookTitle").textContent === "notes",
+    { timeout: 30000 },
+  );
+  await p.waitForFunction(() => document.querySelector("#loading").hidden);
+  await p.locator("#selectText").click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#textLayer span").length > 0,
+  );
+  assert.match(
+    await p.locator("#textLayer").textContent(),
+    /HTML text is extracted/,
+  );
+  assert.equal(await p.evaluate(() => window.__unsafeHtmlRan), undefined);
+  await p.locator("#selectText").click();
+  console.log(
+    "PASS safe HTML text import strips executable content and retains headings",
+  );
+
+  const cbz = new JSZip();
+  const coverBytes = await fs.readFile(
+    new URL("../public/icon-192.png", import.meta.url),
+  );
+  cbz.file("page 10.png", coverBytes);
+  cbz.file("page 2.png", coverBytes);
+  cbz.file("page 1.png", coverBytes);
+  const cbzBuffer = await cbz.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+  });
+  await p.locator("#pdfFile").setInputFiles({
+    name: "small-comic.cbz",
+    mimeType: "application/vnd.comicbook+zip",
+    buffer: cbzBuffer,
+  });
+  await p.waitForFunction(
+    () => document.querySelector("#bookTitle").textContent === "small-comic",
+    { timeout: 30000 },
+  );
+  await p.waitForFunction(() => document.querySelector("#loading").hidden);
+  assert.equal(await p.locator("#pageTotal").textContent(), "/ 3");
+  console.log(
+    "PASS CBZ image-page conversion and numbered comic archive input",
+  );
+  await p.evaluate(() => {
+    window.__readerConsoleError = console.error;
+    console.error = () => {};
+  });
+  for (const extension of ["mobi", "djvu", "cbr"]) {
+    await p.evaluate(() => {
+      document.querySelector("#toast").hidden = true;
+    });
+    await p.locator("#pdfFile").setInputFiles({
+      name: `invalid.${extension}`,
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("not a valid book file"),
+    });
+    await p.waitForFunction(
+      () =>
+        document.querySelector("#loading").hidden &&
+        !document.querySelector("#toast").hidden,
+      { timeout: 30000 },
+    );
+    assert.equal(
+      await p.locator("#bookTitle").textContent(),
+      "small-comic",
+      `invalid ${extension.toUpperCase()} imports do not replace the current book`,
+    );
+  }
+  assert.equal(
+    await p.locator("#bookTitle").textContent(),
+    "small-comic",
+    "invalid imports do not replace the current book",
+  );
+  await p.evaluate(() => {
+    console.error = window.__readerConsoleError;
+    delete window.__readerConsoleError;
+  });
+  console.log("PASS MOBI, DjVu and RAR engines reject malformed files safely");
+  const originalSourceHash = await p.evaluate(async () => {
+    const db = await new Promise((resolve) => {
+      const req = indexedDB.open("FlipVaultDB");
+      req.onsuccess = () => resolve(req.result);
+    });
+    return await new Promise((resolve) => {
+      const req = db.transaction("pdfFiles").objectStore("pdfFiles").getAll();
+      req.onsuccess = () =>
+        resolve(
+          req.result.find((item) => item.sourceName === "hindi-notes.txt")
+            .pdfHash,
+        );
+    });
+  });
+  await p.locator("#pdfFile").setInputFiles({
+    name: "hindi-notes.txt",
+    mimeType: "text/plain",
+    buffer: hindiTextBuffer,
+  });
+  await p.waitForFunction(
+    () => document.querySelector("#bookTitle").textContent === "hindi-notes",
+    { timeout: 30000 },
+  );
+  await p.waitForFunction(() => document.querySelector("#loading").hidden);
+  const restoredSourceHash = await p.evaluate(async () => {
+    const db = await new Promise((resolve) => {
+      const req = indexedDB.open("FlipVaultDB");
+      req.onsuccess = () => resolve(req.result);
+    });
+    return await new Promise((resolve) => {
+      const req = db.transaction("pdfFiles").objectStore("pdfFiles").getAll();
+      req.onsuccess = () =>
+        resolve(
+          req.result.find((item) => item.sourceName === "hindi-notes.txt")
+            .pdfHash,
+        );
+    });
+  });
+  assert.equal(
+    restoredSourceHash,
+    originalSourceHash,
+    "source fingerprint remains stable across re-import and reflow",
+  );
+  console.log(
+    "PASS source-based reading state fingerprint stays stable across re-import",
+  );
+
   await p.screenshot({ path: "test-results/mobile-final.png" });
   assert.deepEqual(errors, []);
   console.log("PASS no uncaught browser errors");
@@ -350,8 +635,9 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
-    assert.equal(await p.locator("#pageInput").inputValue(), "3");
-    console.log("PASS offline app reload and reading restoration");
+    assert.equal(await p.locator("#pageInput").inputValue(), "1");
+    assert.equal(await p.locator("#bookTitle").textContent(), "hindi-notes");
+    console.log("PASS offline app reload and last-imported book restoration");
   }
 } finally {
   await browser.close();

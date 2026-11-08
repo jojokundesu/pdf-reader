@@ -53,6 +53,7 @@ import {
   Sun,
   Timer,
   Trash2,
+  Type,
   Undo2,
   Volume2,
   VolumeX,
@@ -108,6 +109,7 @@ const icons = {
   Sun,
   Timer,
   Trash2,
+  Type,
   Undo2,
   Volume2,
   VolumeX,
@@ -120,6 +122,22 @@ import * as store from "./storage";
 import { AnnotationEngine } from "./annotations";
 import { PageCurl } from "./curl";
 import { makeDemo } from "./demo";
+const supportedBookExtensions = new Set([
+  "pdf",
+  "epub",
+  "mobi",
+  "azw",
+  "azw3",
+  "cbz",
+  "cbr",
+  "djvu",
+  "djv",
+  "txt",
+  "html",
+  "htm",
+]);
+const supportsBook = (name) =>
+  supportedBookExtensions.has(name.split(".").pop()?.toLowerCase());
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const pdfOptions = {
   standardFontDataUrl: import.meta.env.BASE_URL + "standard_fonts/",
@@ -160,7 +178,8 @@ let pdf,
   turning = false,
   searchToken = 0,
   installEvent,
-  fullscreen = false;
+  fullscreen = false,
+  textSelection = false;
 let brush = { color: "#FFEB3B", width: 18, opacity: 0.38, straight: false },
   eraserMode = "pixel",
   eraserWidth = 32,
@@ -176,13 +195,13 @@ let brush = { color: "#FFEB3B", width: 18, opacity: 0.38, straight: false },
 const app = $("#app");
 app.innerHTML = `
 <aside class="rail"><a class="brand" href="#" aria-label="FlipVault home">${icon("book-open")}</a><div class="rail-group">${btn("library", "library-big", "Your library")}${btn("reader", "book-open-text", "Reading room", "active")}${btn("clips", "paperclip", "Paperclips & notes")}${btn("search", "search", "Search this book")}</div><div class="rail-bottom">${btn("help", "circle-help", "Help & getting started")}<span class="avatar">Y</span></div></aside>
-<div class="shell"><header class="topbar hud"><div class="wordmark">FlipVault <span>PRO</span></div><div class="breadcrumb"><span>My library</span>${icon("chevron-right")}<strong id="bookTitle">Opening your reading room…</strong></div><div class="top-actions"><button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a PDF", "import-btn")}</div></header>
+<div class="shell"><header class="topbar hud"><div class="wordmark">FlipVault <span>PRO</span></div><div class="breadcrumb"><span>My library</span>${icon("chevron-right")}<strong id="bookTitle">Opening your reading room…</strong></div><div class="top-actions"><button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a book", "import-btn")}</div></header>
 <main><div class="workspace-header hud"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1></div><button id="focus" class="subtle">${icon("maximize")}<span>Focus mode</span></button></div>
-<div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("hand", "hand", "Read & turn pages", "active")}${btn("marker", "highlighter", "Highlight studio")}${btn("eraser", "eraser", "Eraser studio")}${btn("addClip", "paperclip", "Attach a paperclip")}<span class="divider"></span>${btn("undo", "undo-2", "Undo last highlight")}${btn("redo", "redo-2", "Redo last undone highlight")}</div><div class="toolbar-group zoom-group">${btn("zoomOut", "minus", "Zoom out")}<button id="zoomValue" class="zoom-value">100%</button>${btn("zoomIn", "plus", "Zoom in")}<span class="divider"></span>${btn("more", "ellipsis", "More reading tools")}</div></div>
+<div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("hand", "hand", "Read & turn pages", "active")}${btn("selectText", "type", "Select, copy or share page text")}${btn("marker", "highlighter", "Highlight studio")}${btn("eraser", "eraser", "Eraser studio")}${btn("addClip", "paperclip", "Attach a paperclip")}<span class="divider"></span>${btn("undo", "undo-2", "Undo last highlight")}${btn("redo", "redo-2", "Redo last undone highlight")}</div><div class="toolbar-group zoom-group">${btn("zoomOut", "minus", "Zoom out")}<button id="zoomValue" class="zoom-value">100%</button>${btn("zoomIn", "plus", "Zoom in")}<span class="divider"></span>${btn("more", "ellipsis", "More reading tools")}</div></div>
 <div id="studio" class="studio hud" hidden></div>
-<section id="stage" class="stage" aria-label="Interactive PDF reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><canvas id="leftInk" class="annotation"></canvas><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><canvas id="highlightCanvas" class="annotation"></canvas><div id="uiLayer" class="page-ui"></div><div id="brushCursor"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
+<section id="stage" class="stage" aria-label="Interactive book reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><canvas id="leftInk" class="annotation"></canvas><div id="leftTextLayer" class="text-layer" aria-label="Selectable page text"></div><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><canvas id="highlightCanvas" class="annotation"></canvas><div id="textLayer" class="text-layer" aria-label="Selectable page text"></div><div id="uiLayer" class="page-ui"></div><div id="brushCursor"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
 <footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination">${btn("first", "chevrons-left", "First page")}${btn("prevSmall", "chevron-left", "Previous page")}<label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label>${btn("nextSmall", "chevron-right", "Next page")}${btn("last", "chevrons-right", "Last page")}</div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
-</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><button id="focusTools" class="focus-tools-button" aria-label="Open reader tools" aria-expanded="false">${icon("sliders-horizontal")}<span>Reader tools</span></button><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><input id="pdfFile" type="file" accept="application/pdf,.pdf" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
+</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><button id="focusTools" class="focus-tools-button" aria-label="Open reader tools" aria-expanded="false">${icon("sliders-horizontal")}<span>Reader tools</span></button><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><div id="selectionActions" class="selection-actions" role="toolbar" aria-label="Selected text actions" hidden><span id="selectionCount">Selected text</span><button id="copySelection">Copy</button><button id="shareSelection">Share</button><button id="clearSelection" aria-label="Dismiss selection actions">×</button></div><input id="pdfFile" type="file" accept=".pdf,.epub,.mobi,.azw,.azw3,.cbz,.cbr,.djvu,.djv,.txt,.html,.htm,application/pdf,application/epub+zip,text/plain,text/html" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
 function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.65 } });
 }
@@ -276,8 +295,24 @@ function scheduleSave() {
 }
 async function importPDF(file) {
   $("#loading").hidden = false;
-  const buffer = await file.arrayBuffer(),
-    hash = await store.fingerprint(buffer);
+  $("#loading span:last-child").textContent =
+    `Reading ${file.name} on this device…`;
+  const sourceData = await file.arrayBuffer();
+  const hash = await store.fingerprint(sourceData);
+  const format = file.name.split(".").pop()?.toLowerCase();
+  const imported =
+    format === "pdf"
+      ? { data: sourceData, title: file.name.replace(/\.pdf$/i, ""), format }
+      : await import("./importers").then(({ importBook }) =>
+          importBook(file, sourceData),
+        );
+  const buffer =
+    imported.data instanceof ArrayBuffer
+      ? imported.data
+      : imported.data.buffer.slice(
+          imported.data.byteOffset,
+          imported.data.byteOffset + imported.data.byteLength,
+        );
   let existing = await store.get("pdfFiles", hash);
   if (!existing) {
     const doc = await pdfjs.getDocument({
@@ -293,9 +328,11 @@ async function importPDF(file) {
     existing = {
       pdfHash: hash,
       data: buffer,
-      title: file.name.replace(/\.pdf$/i, ""),
+      title: imported.title || file.name.replace(/\.[^.]+$/, ""),
+      sourceName: file.name,
+      sourceFormat: imported.format || "pdf",
       pageCount: doc.numPages,
-      fileSize: buffer.byteLength,
+      fileSize: file.size,
       cover: c.toDataURL("image/webp", 0.7),
       importedAt: Date.now(),
     };
@@ -303,8 +340,13 @@ async function importPDF(file) {
     await store.put("pdfFiles", existing);
   }
   await openBook(existing);
-  toast("Your book is ready. Make yourself at home.");
+  toast(
+    imported.format === "pdf"
+      ? "Your book is ready. Make yourself at home."
+      : `${file.name} is ready for offline reading.`,
+  );
 }
+
 async function openBook(b) {
   if (state) await save();
   renderToken++;
@@ -312,6 +354,7 @@ async function openBook(b) {
   cache.clear();
   thumbs.clear();
   textCache.clear();
+  pageRenders.clear();
   book = b;
   pdf = await pdfjs.getDocument({ ...pdfOptions, data: b.data.slice(0) })
     .promise;
@@ -351,38 +394,67 @@ function fitSize() {
   );
   return { h: Math.max(140, h), w: Math.max(140, h) * aspect };
 }
+const pageRenders = new Map();
+function renderTarget(scaleBoost = zoom) {
+  const memory = navigator.deviceMemory || 4;
+  const mobile = matchMedia("(max-width: 700px)").matches;
+  const dprCap = memory <= 4 || mobile ? 1.6 : 2;
+  return Math.min(dprCap, devicePixelRatio || 1) * Math.min(scaleBoost, 3);
+}
 function cached(n, scaleBoost = zoom) {
-  const target = Math.min(2, devicePixelRatio || 1) * Math.min(scaleBoost, 3);
   const entry = cache.get(n);
-  return !!entry && entry.res >= target;
+  return !!entry && entry.res >= renderTarget(scaleBoost);
 }
 async function getPageCanvas(n, scaleBoost = zoom) {
   if (n < 1 || n > pdf.numPages) return null;
-  const target = Math.min(2, devicePixelRatio || 1) * Math.min(scaleBoost, 3),
+  const target = renderTarget(scaleBoost),
     key = n;
   const old = cache.get(key);
   if (old && old.res >= target) return old;
-  const p = await pdf.getPage(n),
-    v = p.getViewport({ scale: 1 });
-  const size = fitSize();
-  let scale = Math.min(
-    (target * size.h) / v.height,
-    Math.sqrt(4500000 / (v.width * v.height)),
-  );
-  const vp = p.getViewport({ scale }),
-    c = document.createElement("canvas");
-  c.width = Math.ceil(vp.width);
-  c.height = Math.ceil(vp.height);
-  await p.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
-  const entry = {
-    canvas: c,
-    aspect: v.width / v.height,
-    res: target,
-    pdfWidth: v.width,
-    pdfHeight: v.height,
-  };
-  if (Math.abs(n - page) <= 2) cache.set(key, entry);
-  return entry;
+  const pending = pageRenders.get(key);
+  if (pending && pending.target >= target) return pending.promise;
+  const activeDocument = pdf;
+  const promise = (async () => {
+    const p = await activeDocument.getPage(n),
+      v = p.getViewport({ scale: 1 });
+    const size = fitSize();
+    const memory = navigator.deviceMemory || 4;
+    const pixelBudget = memory <= 4 ? 3_200_000 : 4_500_000;
+    const scale = Math.min(
+      (target * size.h) / v.height,
+      Math.sqrt(pixelBudget / (v.width * v.height)),
+      3000 / Math.max(v.width, v.height),
+    );
+    const vp = p.getViewport({ scale }),
+      c = document.createElement("canvas");
+    c.width = Math.ceil(vp.width);
+    c.height = Math.ceil(vp.height);
+    await p.render({
+      canvasContext: c.getContext("2d", { alpha: false }),
+      viewport: vp,
+    }).promise;
+    const entry = {
+      canvas: c,
+      aspect: v.width / v.height,
+      res: target,
+      pdfWidth: v.width,
+      pdfHeight: v.height,
+      viewport: vp,
+      pdfPage: p,
+    };
+    if (pdf === activeDocument && Math.abs(n - page) <= 2) {
+      const cachedEntry = cache.get(key);
+      if (!cachedEntry || cachedEntry.res <= target) cache.set(key, entry);
+    }
+    return entry;
+  })();
+  const task = { target, promise };
+  pageRenders.set(key, task);
+  try {
+    return await promise;
+  } finally {
+    if (pageRenders.get(key) === task) pageRenders.delete(key);
+  }
 }
 function drawClips(ctx, n, w, h) {
   for (const c of state.paperclips.filter((c) => c.page === n)) {
@@ -435,6 +507,140 @@ async function composite(n) {
   drawClips(ctx, n, c.width, c.height);
   return c;
 }
+const activeTextLayers = new WeakMap();
+async function renderTextLayer(n, entry, container) {
+  const token = (activeTextLayers.get(container) || 0) + 1;
+  activeTextLayers.set(container, token);
+  container.replaceChildren();
+  container.dataset.page = n;
+  const baseViewport = entry.pdfPage.getViewport({ scale: 1 });
+  container.style.setProperty(
+    "--scale-factor",
+    container.clientHeight / baseViewport.height || 1,
+  );
+  try {
+    const content = await entry.pdfPage.getTextContent({
+      includeMarkedContent: true,
+    });
+    if (!textSelection || activeTextLayers.get(container) !== token) return;
+    const layer = new pdfjs.TextLayer({
+      textContentSource: content,
+      container,
+      viewport: entry.viewport,
+    });
+    await layer.render();
+    if (!textSelection || activeTextLayers.get(container) !== token)
+      container.replaceChildren();
+  } catch (error) {
+    if (activeTextLayers.get(container) === token) container.replaceChildren();
+    console.warn("Page text layer unavailable", error);
+  }
+}
+function toggleTextSelection(enabled = !textSelection) {
+  textSelection = !!enabled;
+  if (textSelection && tool !== "hand") setTool("hand");
+  document.body.classList.toggle("text-selection", textSelection);
+  $("#selectText").classList.toggle("active", textSelection);
+  $("#selectText").setAttribute("aria-pressed", String(textSelection));
+  $("#selectText").title = textSelection
+    ? "Stop selecting text"
+    : "Select, copy or share page text";
+  $("#selectionActions").hidden = true;
+  window.getSelection()?.removeAllRanges();
+  if (textSelection && pdf) {
+    getPageCanvas(page)
+      .then((entry) => renderTextLayer(page, entry, $("#textLayer")))
+      .catch(fail);
+    if (!$("#leftPage").hidden) {
+      const leftNumber = +$("#leftPage").dataset.page;
+      getPageCanvas(leftNumber)
+        .then((entry) =>
+          renderTextLayer(leftNumber, entry, $("#leftTextLayer")),
+        )
+        .catch(fail);
+    }
+  } else {
+    for (const element of [$("#textLayer"), $("#leftTextLayer")]) {
+      activeTextLayers.set(element, (activeTextLayers.get(element) || 0) + 1);
+      element.replaceChildren();
+    }
+  }
+}
+function selectedPageText() {
+  return window.getSelection()?.toString().replace(/\s+/g, " ").trim() || "";
+}
+function updateSelectionActions() {
+  const text = selectedPageText(),
+    actions = $("#selectionActions");
+  if (!textSelection || text.length < 2) {
+    actions.hidden = true;
+    return;
+  }
+  $("#selectionCount").textContent =
+    `${text.length.toLocaleString()} characters selected`;
+  actions.hidden = false;
+  const selection = window.getSelection();
+  if (selection?.rangeCount) {
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    const left = Math.max(
+      10,
+      Math.min(
+        innerWidth - actions.offsetWidth - 10,
+        rect.left + rect.width / 2 - actions.offsetWidth / 2,
+      ),
+    );
+    const top =
+      rect.top > 88
+        ? rect.top - 58
+        : Math.min(innerHeight - 62, rect.bottom + 12);
+    actions.style.left = `${left}px`;
+    actions.style.top = `${Math.max(10, top)}px`;
+  }
+}
+async function copySelection() {
+  const text = selectedPageText();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    if (!copied)
+      throw Error("Your browser did not allow copying this selection.");
+  }
+  toast("Selected passage copied.");
+}
+async function shareSelection() {
+  const text = selectedPageText();
+  if (!text) return;
+  if (!navigator.share) {
+    await copySelection();
+    toast("Sharing is not available here, so the passage was copied instead.");
+    return;
+  }
+  try {
+    await navigator.share({
+      title: book?.title || "A passage from FlipVault Pro",
+      text,
+    });
+  } catch (error) {
+    if (error.name !== "AbortError") throw error;
+  }
+}
+document.addEventListener("selectionchange", updateSelectionActions);
+$("#copySelection").onclick = run(copySelection);
+$("#shareSelection").onclick = run(shareSelection);
+$("#clearSelection").onclick = () => {
+  window.getSelection()?.removeAllRanges();
+  $("#selectionActions").hidden = true;
+};
+
 async function render() {
   if (!pdf) return;
   const token = ++renderToken;
@@ -459,6 +665,8 @@ async function render() {
   ink.height = c.height;
   ann.logicalHeight = 1000 / entry.aspect;
   ann.load(state.pageAnnotations[page] || [], book.pdfHash + ":" + page);
+  if (textSelection) renderTextLayer(page, entry, $("#textLayer"));
+  else $("#textLayer").replaceChildren();
   $("#leftPage").hidden = !spread;
   if (spread) {
     const leftNum = page > 1 ? page - 1 : Math.min(2, pdf.numPages);
@@ -476,6 +684,8 @@ async function render() {
     le.items = state.pageAnnotations[leftNum] || [];
     le.render();
     renderPageClips($("#leftUI"), leftNum);
+    if (textSelection) renderTextLayer(leftNum, left, $("#leftTextLayer"));
+    else $("#leftTextLayer").replaceChildren();
     $("#leftPage").dataset.page = leftNum;
   }
   renderPageClips($("#uiLayer"), page);
@@ -513,7 +723,12 @@ async function go(n, animate = false) {
     ann.finish();
     gesture = null;
   }
-  if (animate && Math.abs(n - page) === 1 && zoom === 1) {
+  if (
+    animate &&
+    Math.abs(n - page) === 1 &&
+    zoom === 1 &&
+    !matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
     await turn(n > page ? 1 : -1);
     return;
   }
@@ -694,6 +909,7 @@ document.addEventListener("pointerdown", unlockPageAudio, {
 });
 document.addEventListener("keydown", unlockPageAudio, { capture: true });
 function setTool(t) {
+  if (t !== "hand" && textSelection) toggleTextSelection(false);
   tool = t;
   ["hand", "marker", "eraser"].forEach((id) =>
     $("#" + id).classList.toggle("active", id === t),
@@ -890,7 +1106,7 @@ async function showLibrary() {
   openDrawer(
     "Your library.",
     "Good books deserve a home.",
-    `<button id="libraryImport" class="primary full">${icon("plus")} Add a PDF</button><div class="library-grid">${books
+    `<button id="libraryImport" class="primary full">${icon("plus")} Add a book</button><p class="muted import-formats">PDF · EPUB · MOBI / AZW3 · CBZ / CBR · DjVu · TXT / HTML. Imports are converted on-device; original files are not uploaded.</p><div class="library-grid">${books
       .map((b) => {
         const s = states.find((s) => s.pdfHash === b.pdfHash);
         return `<article class="library-book"><button class="open-book" data-hash="${b.pdfHash}"><img src="${b.cover}" alt="Cover of ${esc(b.title)}"><strong>${esc(b.title)}</strong><span>${b.pageCount} pages · ${Math.round(b.fileSize / 1024)} KB</span><div class="book-progress"><span style="width:${((s?.lastPage || 1) / b.pageCount) * 100}%"></span></div><small>${b.pdfHash === book.pdfHash ? "Currently reading" : `Page ${s?.lastPage || 1} of ${b.pageCount}`}</small></button><button class="remove-book" data-hash="${b.pdfHash}" title="Remove book from device">${icon("trash-2")}</button></article>`;
@@ -915,7 +1131,7 @@ async function showLibrary() {
         }
         if (
           confirm(
-            "Remove this PDF from this device? Saved notes will be kept for re-import.",
+            "Remove this book from this device? Saved notes will be kept for re-import.",
           )
         ) {
           await store.remove("pdfFiles", el.dataset.hash);
@@ -1423,9 +1639,15 @@ const tutorialSteps = [
   },
   {
     title: "Settle in your way.",
-    eyebrow: "3 OF 3 · PERSONALISE",
+    eyebrow: "3 OF 4 · PERSONALISE",
     text: "Pinch to zoom and drag to pan. Choose page layout, paper appearance, and reading background from the toolbar. In focus mode, Reader tools keeps the controls and thumbnails close at hand.",
     visual: "sliders-horizontal",
+  },
+  {
+    title: "Keep a passage close.",
+    eyebrow: "4 OF 4 · SELECT & SHARE",
+    text: "Choose Select text, then drag across words on a page. Copy a quote for your notes or share a passage with another app. Your document stays on this device until you choose to share something.",
+    visual: "type",
   },
 ];
 function showTutorial(step = 0) {
@@ -1455,7 +1677,7 @@ function updateFocusFilmstrip() {
 function showFocusTools() {
   const panel = $("#focusPanel"),
     button = $("#focusTools");
-  panel.innerHTML = `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Minimize reader tools">${icon("minus")}</button></div><div class="focus-tools-grid"><button data-focus="hand">${icon("hand")}<span>Read</span></button><button data-focus="marker">${icon("highlighter")}<span>Marker</span></button><button data-focus="eraser">${icon("eraser")}<span>Eraser</span></button><button data-focus="bookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="focusFilmstrip" aria-pressed="${document.body.classList.contains("focus-filmstrip")}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button data-focus="zoom-out">${icon("minus")}<span>Zoom out</span></button><button data-focus="zoom-in">${icon("plus")}<span>Zoom in</span></button><button data-focus="sound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button data-focus="search">${icon("search")}<span>Search book</span></button><button data-focus="more">${icon("ellipsis")}<span>More options</span></button><button data-focus="tutorial">${icon("circle-help")}<span>App guide</span></button></div>`;
+  panel.innerHTML = `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Minimize reader tools">${icon("minus")}</button></div><div class="focus-tools-grid"><button data-focus="hand">${icon("hand")}<span>Read</span></button><button data-focus="selectText">${icon("type")}<span>Select & copy</span></button><button data-focus="marker">${icon("highlighter")}<span>Marker</span></button><button data-focus="eraser">${icon("eraser")}<span>Eraser</span></button><button data-focus="bookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="focusFilmstrip" aria-pressed="${document.body.classList.contains("focus-filmstrip")}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button data-focus="zoom-out">${icon("minus")}<span>Zoom out</span></button><button data-focus="zoom-in">${icon("plus")}<span>Zoom in</span></button><button data-focus="sound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button data-focus="search">${icon("search")}<span>Search book</span></button><button data-focus="more">${icon("ellipsis")}<span>More options</span></button><button data-focus="tutorial">${icon("circle-help")}<span>App guide</span></button></div>`;
   panel.hidden = false;
   button.setAttribute("aria-expanded", "true");
   $("#minimizeFocusTools").onclick = () => {
@@ -1467,6 +1689,9 @@ function showFocusTools() {
       switch (el.dataset.focus) {
         case "hand":
           setTool("hand");
+          break;
+        case "selectText":
+          toggleTextSelection();
           break;
         case "marker":
           setTool("marker");
@@ -1592,6 +1817,7 @@ surface.addEventListener(
   run(async (e) => {
     if (
       !ready ||
+      (textSelection && e.target.closest(".text-layer")) ||
       turning ||
       e.target.closest("button") ||
       (e.pointerType === "mouse" && e.button !== 0)
@@ -1834,8 +2060,11 @@ $("#bookViewport").addEventListener(
   { passive: false },
 );
 function leaveFocusMode() {
+  if (textSelection) toggleTextSelection(false);
   document.body.classList.remove("focus-mode", "focus-filmstrip");
   fullscreen = false;
+  textSelection = false;
+  document.body.classList.remove("text-selection");
   $("#focusPanel").hidden = true;
   $("#focusTools").setAttribute("aria-expanded", "false");
   $("#filmstrip").hidden = false;
@@ -1886,6 +2115,7 @@ on("vault", showVault);
 on("export", () => toggleMenu("export", showExport));
 on("more", () => toggleMenu("more", showMore));
 on("import", () => $("#pdfFile").click());
+on("selectText", () => toggleTextSelection());
 on("prev", () => go(page - (rtl ? -1 : 1), true));
 on("next", () => go(page + (rtl ? -1 : 1), true));
 on("prevSmall", () => go(page - 1, true));
@@ -1930,7 +2160,13 @@ on("filmToggle", () => {
 $("#pageInput").onchange = run((e) => go(+e.target.value));
 $("#drawerBackdrop").onclick = closeDrawer;
 $("#pdfFile").onchange = run(async (e) => {
-  for (const f of e.target.files) await importPDF(f);
+  for (const f of e.target.files) {
+    if (!supportsBook(f.name)) {
+      toast(`Unsupported file: ${f.name}`);
+      continue;
+    }
+    await importPDF(f);
+  }
   e.target.value = "";
 });
 $("#vaultFile").onchange = run(async (e) => {
@@ -2030,8 +2266,7 @@ window.addEventListener(
   run(async (e) => {
     e.preventDefault();
     for (const f of e.dataTransfer.files)
-      if (f.type === "application/pdf" || f.name.endsWith(".pdf"))
-        await importPDF(f);
+      if (supportsBook(f.name)) await importPDF(f);
   }),
 );
 async function init() {
