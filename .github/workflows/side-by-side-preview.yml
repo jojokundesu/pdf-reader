@@ -1,5 +1,7 @@
 name: Explicit side-by-side Android preview download
 on:
+  push:
+    branches: [arena/9d3bad6a-pdf-reader]
   workflow_dispatch:
 permissions:
   contents: write
