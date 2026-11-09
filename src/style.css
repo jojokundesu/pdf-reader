@@ -2651,7 +2651,7 @@ textarea {
 .focus-search {
   display: none;
   position: fixed;
-  top: max(14px, env(safe-area-inset-top));
+  top: max(64px, env(safe-area-inset-top));
   right: max(14px, env(safe-area-inset-right));
   z-index: 41;
   min-width: 48px;
