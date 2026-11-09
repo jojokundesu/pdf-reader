@@ -25,6 +25,7 @@ const state = {
       edge: "top",
       color: "#b9c6ce",
       note: "Remember this",
+      quote: "A passage attached to this comment.",
     },
   ],
   pageAnnotations: {
@@ -67,6 +68,12 @@ test("malformed or hostile backup data is rejected before writes", async () => {
     validateState({
       ...state,
       paperclips: [{ ...state.paperclips[0], color: '" onload="alert(1)' }],
+    }),
+  );
+  assert.throws(() =>
+    validateState({
+      ...state,
+      paperclips: [{ ...state.paperclips[0], quote: "x".repeat(5001) }],
     }),
   );
   assert.throws(() =>

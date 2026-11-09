@@ -122,6 +122,11 @@ import * as store from "./storage";
 import { AnnotationEngine } from "./annotations";
 import { PageCurl } from "./curl";
 import { makeDemo } from "./demo";
+import {
+  canonicalPageText,
+  findTextMatches,
+  rangesForTextMatches,
+} from "./text-search.js";
 const supportedBookExtensions = new Set([
   "pdf",
   "epub",
@@ -177,6 +182,10 @@ let pdf,
   renderToken = 0,
   turning = false,
   searchToken = 0,
+  searchHits = [],
+  activeSearchHit = -1,
+  searchQuery = "",
+  selectionSnapshot = { text: "", page: 0, rect: null },
   installEvent,
   fullscreen = false,
   textSelection = false;
@@ -195,13 +204,13 @@ let brush = { color: "#FFEB3B", width: 18, opacity: 0.38, straight: false },
 const app = $("#app");
 app.innerHTML = `
 <aside class="rail"><a class="brand" href="#" aria-label="FlipVault home">${icon("book-open")}</a><div class="rail-group">${btn("library", "library-big", "Your library")}${btn("reader", "book-open-text", "Reading room", "active")}${btn("clips", "paperclip", "Paperclips & notes")}${btn("search", "search", "Search this book")}</div><div class="rail-bottom">${btn("help", "circle-help", "Help & getting started")}<span class="avatar">Y</span></div></aside>
-<div class="shell"><header class="topbar hud"><div class="wordmark">FlipVault <span>PRO</span></div><div class="breadcrumb"><span>My library</span>${icon("chevron-right")}<strong id="bookTitle">Opening your reading room…</strong></div><div class="top-actions"><button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a book", "import-btn")}</div></header>
+<div class="shell"><header class="topbar hud"><div class="wordmark">FlipVault <span>PRO</span></div><div class="breadcrumb"><span>My library</span>${icon("chevron-right")}<strong id="bookTitle">Opening your reading room…</strong></div><div class="top-actions">${btn("searchTop", "search", "Search this book", "search-top")}<button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a book", "import-btn")}</div></header>
 <main><div class="workspace-header hud"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1></div><button id="focus" class="subtle">${icon("maximize")}<span>Focus mode</span></button></div>
 <div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("hand", "hand", "Read & turn pages", "active")}${btn("selectText", "type", "Select, copy or share page text")}${btn("marker", "highlighter", "Highlight studio")}${btn("eraser", "eraser", "Eraser studio")}${btn("addClip", "paperclip", "Attach a paperclip")}<span class="divider"></span>${btn("undo", "undo-2", "Undo last highlight")}${btn("redo", "redo-2", "Redo last undone highlight")}</div><div class="toolbar-group zoom-group">${btn("zoomOut", "minus", "Zoom out")}<button id="zoomValue" class="zoom-value">100%</button>${btn("zoomIn", "plus", "Zoom in")}<span class="divider"></span>${btn("more", "ellipsis", "More reading tools")}</div></div>
 <div id="studio" class="studio hud" hidden></div>
 <section id="stage" class="stage" aria-label="Interactive book reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><canvas id="leftInk" class="annotation"></canvas><div id="leftTextLayer" class="text-layer" aria-label="Selectable page text"></div><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><canvas id="highlightCanvas" class="annotation"></canvas><div id="textLayer" class="text-layer" aria-label="Selectable page text"></div><div id="uiLayer" class="page-ui"></div><div id="brushCursor"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
 <footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination">${btn("first", "chevrons-left", "First page")}${btn("prevSmall", "chevron-left", "Previous page")}<label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label>${btn("nextSmall", "chevron-right", "Next page")}${btn("last", "chevrons-right", "Last page")}</div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
-</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><button id="focusTools" class="focus-tools-button" aria-label="Open reader tools" aria-expanded="false">${icon("sliders-horizontal")}<span>Reader tools</span></button><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><div id="selectionActions" class="selection-actions" role="toolbar" aria-label="Selected text actions" hidden><span id="selectionCount">Selected text</span><button id="copySelection">Copy</button><button id="shareSelection">Share</button><button id="clearSelection" aria-label="Dismiss selection actions">×</button></div><input id="pdfFile" type="file" accept=".pdf,.epub,.mobi,.azw,.azw3,.cbz,.cbr,.djvu,.djv,.txt,.html,.htm,application/pdf,application/epub+zip,text/plain,text/html" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
+</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><button id="focusTools" class="focus-tools-button" aria-label="Open reader tools" aria-expanded="false">${icon("sliders-horizontal")}<span>Reader tools</span></button><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><button id="focusSearch" class="focus-search" aria-label="Search this book">${icon("search")}<span>Find</span></button><section id="readerSearch" class="reader-search" role="search" aria-label="Search this book" hidden><button id="closeSearch" class="search-close" aria-label="Close search">${icon("x")}</button><input id="searchInput" type="search" enterkeyhint="search" placeholder="Find in this document" aria-label="Find in this document" autocomplete="off"><span id="searchStatus" class="search-status" aria-live="polite">0 of 0</span><button id="previousSearchHit" aria-label="Previous match">${icon("chevron-left")}</button><button id="nextSearchHit" aria-label="Next match">${icon("chevron-right")}</button><button id="selectSearchHit" aria-label="Actions for current match" title="Select this match for copy, translation or comment" disabled>⋯</button></section><div id="selectionActions" class="selection-actions" role="toolbar" aria-label="Selected text actions" hidden><span id="selectionCount">Selected text</span><button id="copySelection">Copy</button><button id="translateSelection">Translate</button><button id="commentSelection">Comment</button><button id="moreSelection" aria-expanded="false">More</button><button id="clearSelection" aria-label="Dismiss selection actions">×</button></div><div id="selectionMenu" class="selection-menu" hidden><button id="selectAllSelection">Select all on page</button><button id="shareSelection">Share selection</button></div><input id="pdfFile" type="file" accept=".pdf,.epub,.mobi,.azw,.azw3,.cbz,.cbr,.djvu,.djv,.txt,.html,.htm,application/pdf,application/epub+zip,text/plain,text/html" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
 function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.65 } });
 }
@@ -366,6 +375,16 @@ async function openBook(b) {
   rtl = !!state.rtl;
   baseSeconds = state.totalReadingTimeSeconds || 0;
   sessionStart = Date.now();
+  const mobileReader = matchMedia("(max-width: 700px)").matches;
+  textSelection = false;
+  document.body.classList.remove("text-selection");
+  $("#selectText").classList.remove("active");
+  $("#selectText").setAttribute("aria-pressed", "false");
+  if (mobileReader) {
+    document.body.classList.add("focus-mode", "focus-filmstrip");
+    fullscreen = true;
+    $("#filmstrip").hidden = false;
+  }
   $("#bookTitle").textContent = b.title;
   $("#pageTotal").textContent = "/ " + pdf.numPages;
   $("#pageInput").max = pdf.numPages;
@@ -398,7 +417,7 @@ const pageRenders = new Map();
 function renderTarget(scaleBoost = zoom) {
   const memory = navigator.deviceMemory || 4;
   const mobile = matchMedia("(max-width: 700px)").matches;
-  const dprCap = memory <= 4 || mobile ? 1.6 : 2;
+  const dprCap = memory <= 2 ? 2 : memory <= 4 || mobile ? 2.35 : 2.75;
   return Math.min(dprCap, devicePixelRatio || 1) * Math.min(scaleBoost, 3);
 }
 function cached(n, scaleBoost = zoom) {
@@ -419,11 +438,12 @@ async function getPageCanvas(n, scaleBoost = zoom) {
       v = p.getViewport({ scale: 1 });
     const size = fitSize();
     const memory = navigator.deviceMemory || 4;
-    const pixelBudget = memory <= 4 ? 3_200_000 : 4_500_000;
+    const pixelBudget =
+      memory <= 2 ? 4_500_000 : memory <= 4 ? 6_500_000 : 8_500_000;
     const scale = Math.min(
       (target * size.h) / v.height,
       Math.sqrt(pixelBudget / (v.width * v.height)),
-      3000 / Math.max(v.width, v.height),
+      4600 / Math.max(v.width, v.height),
     );
     const vp = p.getViewport({ scale }),
       c = document.createElement("canvas");
@@ -508,6 +528,30 @@ async function composite(n) {
   return c;
 }
 const activeTextLayers = new WeakMap();
+function applySearchHighlights() {
+  const registry = window.CSS?.highlights;
+  if (!registry || typeof window.Highlight !== "function") return;
+  registry.delete("flipvault-search-match");
+  registry.delete("flipvault-search-current");
+  if (!searchQuery || !searchHits.length) return;
+
+  const all = [];
+  let current = null;
+  for (const container of [$("#leftTextLayer"), $("#textLayer")]) {
+    if (!container.childNodes.length) continue;
+    const pageNumber = Number(container.dataset.page);
+    const pageMatches = rangesForTextMatches(container, searchQuery);
+    all.push(...pageMatches.map((match) => match.range));
+    if (pageNumber === searchHits[activeSearchHit]?.page) {
+      const occurrenceOnPage = searchHits
+        .slice(0, activeSearchHit)
+        .filter((hit) => hit.page === pageNumber).length;
+      current = pageMatches[occurrenceOnPage]?.range || pageMatches[0]?.range;
+    }
+  }
+  if (all.length) registry.set("flipvault-search-match", new Highlight(...all));
+  if (current) registry.set("flipvault-search-current", new Highlight(current));
+}
 async function renderTextLayer(n, entry, container) {
   const token = (activeTextLayers.get(container) || 0) + 1;
   activeTextLayers.set(container, token);
@@ -522,15 +566,23 @@ async function renderTextLayer(n, entry, container) {
     const content = await entry.pdfPage.getTextContent({
       includeMarkedContent: true,
     });
-    if (!textSelection || activeTextLayers.get(container) !== token) return;
+    if (
+      (!textSelection && !searchQuery) ||
+      activeTextLayers.get(container) !== token
+    )
+      return;
     const layer = new pdfjs.TextLayer({
       textContentSource: content,
       container,
       viewport: entry.viewport,
     });
     await layer.render();
-    if (!textSelection || activeTextLayers.get(container) !== token)
+    if (
+      (!textSelection && !searchQuery) ||
+      activeTextLayers.get(container) !== token
+    )
       container.replaceChildren();
+    applySearchHighlights();
   } catch (error) {
     if (activeTextLayers.get(container) === token) container.replaceChildren();
     console.warn("Page text layer unavailable", error);
@@ -546,56 +598,207 @@ function toggleTextSelection(enabled = !textSelection) {
     ? "Stop selecting text"
     : "Select, copy or share page text";
   $("#selectionActions").hidden = true;
+  $("#selectionMenu").hidden = true;
+  selectionSnapshot = { text: "", page: 0, rect: null };
   window.getSelection()?.removeAllRanges();
   if (textSelection && pdf) {
-    getPageCanvas(page)
-      .then((entry) => renderTextLayer(page, entry, $("#textLayer")))
-      .catch(fail);
+    const renders = [
+      getPageCanvas(page).then((entry) =>
+        renderTextLayer(page, entry, $("#textLayer")),
+      ),
+    ];
     if (!$("#leftPage").hidden) {
       const leftNumber = +$("#leftPage").dataset.page;
-      getPageCanvas(leftNumber)
-        .then((entry) =>
+      renders.push(
+        getPageCanvas(leftNumber).then((entry) =>
           renderTextLayer(leftNumber, entry, $("#leftTextLayer")),
-        )
-        .catch(fail);
+        ),
+      );
     }
-  } else {
+    return Promise.all(renders).catch(fail);
+  }
+  if (!searchQuery) {
     for (const element of [$("#textLayer"), $("#leftTextLayer")]) {
       activeTextLayers.set(element, (activeTextLayers.get(element) || 0) + 1);
       element.replaceChildren();
     }
   }
+  return Promise.resolve();
 }
-function selectedPageText() {
-  return window.getSelection()?.toString().replace(/\s+/g, " ").trim() || "";
-}
-function updateSelectionActions() {
-  const text = selectedPageText(),
-    actions = $("#selectionActions");
-  if (!textSelection || text.length < 2) {
-    actions.hidden = true;
+async function selectTextAtPoint(x, y) {
+  if (!pdf) return;
+  await toggleTextSelection(true);
+
+  let caretRange = document.caretRangeFromPoint?.(x, y);
+  if (!caretRange) {
+    const position = document.caretPositionFromPoint?.(x, y);
+    if (position) {
+      caretRange = document.createRange();
+      caretRange.setStart(position.offsetNode, position.offset);
+      caretRange.collapse(true);
+    }
+  }
+  if (!caretRange || !$("#textLayer").contains(caretRange.startContainer)) {
+    toast("There is no selectable text at that point in this document.");
     return;
   }
-  $("#selectionCount").textContent =
-    `${text.length.toLocaleString()} characters selected`;
-  actions.hidden = false;
+
+  const node = caretRange.startContainer;
+  const offset = caretRange.startOffset;
+  if (node.nodeType !== Node.TEXT_NODE) return;
+  const text = node.nodeValue;
+  let word;
+  if (typeof Intl.Segmenter === "function") {
+    for (const segment of new Intl.Segmenter(undefined, {
+      granularity: "word",
+    }).segment(text)) {
+      if (
+        segment.isWordLike &&
+        offset >= segment.index &&
+        offset <= segment.index + segment.segment.length
+      ) {
+        word = {
+          start: segment.index,
+          end: segment.index + segment.segment.length,
+        };
+        break;
+      }
+    }
+  }
+  if (!word) {
+    const pattern = /[\p{L}\p{N}\p{M}_’'-]+/gu;
+    for (const match of text.matchAll(pattern)) {
+      if (offset >= match.index && offset <= match.index + match[0].length) {
+        word = { start: match.index, end: match.index + match[0].length };
+        break;
+      }
+    }
+  }
+  if (!word) {
+    toast("There is no selectable word at that point in this document.");
+    return;
+  }
+
+  const range = document.createRange();
+  range.setStart(node, word.start);
+  range.setEnd(node, word.end);
   const selection = window.getSelection();
-  if (selection?.rangeCount) {
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+function selectedPageText() {
+  const live = window.getSelection()?.toString().replace(/\s+/g, " ").trim();
+  return live || selectionSnapshot.text;
+}
+function updateSelectionActions() {
+  const selection = window.getSelection();
+  const live = selection?.toString().replace(/\s+/g, " ").trim() || "";
+  if (live && selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    const layer = selection.anchorNode?.parentElement?.closest(".text-layer");
+    const rect = range.getBoundingClientRect();
+    selectionSnapshot = {
+      text: live,
+      page: Number(layer?.dataset.page) || page,
+      rect: {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      },
+    };
+  }
+  const text = live || selectionSnapshot.text;
+  const actions = $("#selectionActions");
+  if (!textSelection || text.length < 1) {
+    actions.hidden = true;
+    $("#selectionMenu").hidden = true;
+    $("#moreSelection").setAttribute("aria-expanded", "false");
+    return;
+  }
+  $("#selectionCount").textContent = `${text.length.toLocaleString()} selected`;
+  actions.hidden = false;
+  const rect = selection?.rangeCount
+    ? selection.getRangeAt(0).getBoundingClientRect()
+    : selectionSnapshot.rect;
+  if (rect) {
     const left = Math.max(
-      10,
+      8,
       Math.min(
-        innerWidth - actions.offsetWidth - 10,
+        innerWidth - actions.offsetWidth - 8,
         rect.left + rect.width / 2 - actions.offsetWidth / 2,
       ),
     );
-    const top =
-      rect.top > 88
-        ? rect.top - 58
-        : Math.min(innerHeight - 62, rect.bottom + 12);
+    const top = rect.top > 104 ? rect.top - 58 : rect.bottom + 10;
     actions.style.left = `${left}px`;
-    actions.style.top = `${Math.max(10, top)}px`;
+    actions.style.top = `${Math.max(8, Math.min(innerHeight - 58, top))}px`;
   }
+}
+function selectAllVisiblePageText() {
+  const selectedNode = window.getSelection()?.anchorNode;
+  const layer =
+    selectedNode?.parentElement?.closest(".text-layer") || $("#textLayer");
+  if (!layer?.textContent.trim()) return;
+  const range = document.createRange();
+  range.selectNodeContents(layer);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  $("#selectionMenu").hidden = true;
+  $("#moreSelection").setAttribute("aria-expanded", "false");
+  updateSelectionActions();
+}
+async function openExternalUrl(url) {
+  if (store.isNative()) {
+    const { Browser } = await import("@capacitor/browser");
+    await Browser.open({ url });
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+function translateSelection() {
+  const text = selectedPageText();
+  if (!text) return;
+  const d = dialog(
+    "Translate selection",
+    `<p class="muted">The selected passage will open in Google Translate. Translation requires an internet connection.</p><p class="selected-quote">“${esc(text.slice(0, 500))}${text.length > 500 ? "…" : ""}”</p><label class="field-label" for="translateLanguage">TRANSLATE TO</label><select id="translateLanguage" class="full-input"><option value="en">English</option><option value="hi">Hindi</option><option value="bn">Bengali</option><option value="ta">Tamil</option><option value="te">Telugu</option><option value="ur">Urdu</option><option value="fr">French</option><option value="es">Spanish</option><option value="de">German</option><option value="ja">Japanese</option></select>`,
+    `<button id="cancelTranslate" class="secondary">Cancel</button><button id="openTranslate" class="primary">Open Translate</button>`,
+  );
+  $("#cancelTranslate").onclick = () => d.close();
+  $("#openTranslate").onclick = async () => {
+    const target = $("#translateLanguage").value;
+    d.close();
+    await openExternalUrl(
+      `https://translate.google.com/?sl=auto&tl=${encodeURIComponent(target)}&text=${encodeURIComponent(text)}`,
+    );
+  };
+}
+function commentSelection() {
+  const text = selectedPageText();
+  if (!text) return;
+  const selection = window.getSelection();
+  const layer = selection?.anchorNode?.parentElement?.closest(".text-layer");
+  const pageNumber =
+    selectionSnapshot.page || Number(layer?.dataset.page) || page;
+  const rect = selection?.rangeCount
+    ? selection.getRangeAt(0).getBoundingClientRect()
+    : selectionSnapshot.rect;
+  const pageElement = pageNumber === page ? $("#rightPage") : $("#leftPage");
+  const bounds = pageElement.getBoundingClientRect();
+  const position = rect
+    ? Math.max(
+        0.02,
+        Math.min(
+          0.98,
+          (rect.top + rect.height / 2 - bounds.top) / bounds.height,
+        ),
+      )
+    : 0.5;
+  $("#selectionMenu").hidden = true;
+  $("#moreSelection").setAttribute("aria-expanded", "false");
+  editClip(null, { page: pageNumber, position, quote: text, isComment: true });
 }
 async function copySelection() {
   const text = selectedPageText();
@@ -635,11 +838,32 @@ async function shareSelection() {
 }
 document.addEventListener("selectionchange", updateSelectionActions);
 $("#copySelection").onclick = run(copySelection);
+$("#translateSelection").onclick = translateSelection;
+$("#commentSelection").onclick = commentSelection;
+$("#moreSelection").onclick = () => {
+  const menu = $("#selectionMenu");
+  menu.hidden = !menu.hidden;
+  $("#moreSelection").setAttribute("aria-expanded", String(!menu.hidden));
+  if (!menu.hidden) {
+    const actions = $("#selectionActions").getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(innerWidth - menu.offsetWidth - 8, actions.left + actions.width - menu.offsetWidth))}px`;
+    menu.style.top = `${Math.min(innerHeight - menu.offsetHeight - 8, actions.bottom + 6)}px`;
+  }
+};
+$("#selectAllSelection").onclick = selectAllVisiblePageText;
 $("#shareSelection").onclick = run(shareSelection);
 $("#clearSelection").onclick = () => {
+  selectionSnapshot = { text: "", page: 0, rect: null };
   window.getSelection()?.removeAllRanges();
   $("#selectionActions").hidden = true;
+  $("#selectionMenu").hidden = true;
 };
+document.addEventListener("pointerdown", (event) => {
+  if (!event.target.closest("#selectionActions,#selectionMenu")) {
+    $("#selectionMenu").hidden = true;
+    $("#moreSelection").setAttribute("aria-expanded", "false");
+  }
+});
 
 async function render() {
   if (!pdf) return;
@@ -665,7 +889,8 @@ async function render() {
   ink.height = c.height;
   ann.logicalHeight = 1000 / entry.aspect;
   ann.load(state.pageAnnotations[page] || [], book.pdfHash + ":" + page);
-  if (textSelection) renderTextLayer(page, entry, $("#textLayer"));
+  if (textSelection || searchQuery)
+    await renderTextLayer(page, entry, $("#textLayer"));
   else $("#textLayer").replaceChildren();
   $("#leftPage").hidden = !spread;
   if (spread) {
@@ -684,7 +909,8 @@ async function render() {
     le.items = state.pageAnnotations[leftNum] || [];
     le.render();
     renderPageClips($("#leftUI"), leftNum);
-    if (textSelection) renderTextLayer(leftNum, left, $("#leftTextLayer"));
+    if (textSelection || searchQuery)
+      await renderTextLayer(leftNum, left, $("#leftTextLayer"));
     else $("#leftTextLayer").replaceChildren();
     $("#leftPage").dataset.page = leftNum;
   }
@@ -716,9 +942,13 @@ async function render() {
   updateReadingStats();
   if ($("#reference").hidden === false) showReference(referencePage);
 }
-async function go(n, animate = false) {
+async function go(n, animate = false, playSound = true) {
   n = Math.max(1, Math.min(pdf.numPages, Math.round(n)));
   if (n === page || turning || !Number.isFinite(n)) return;
+  selectionSnapshot = { text: "", page: 0, rect: null };
+  window.getSelection()?.removeAllRanges();
+  $("#selectionActions").hidden = true;
+  $("#selectionMenu").hidden = true;
   if (gesture?.drawing) {
     ann.finish();
     gesture = null;
@@ -735,7 +965,7 @@ async function go(n, animate = false) {
   const activePdf = pdf;
   page = n;
   await render();
-  if (pdf === activePdf && page === n) pageAudio.play();
+  if (playSound && pdf === activePdf && page === n) pageAudio.play();
   $("#filmstrip .selected")?.scrollIntoView({
     block: "nearest",
     inline: "center",
@@ -1014,19 +1244,28 @@ function confirmDialog(title, body, fn) {
     d.close();
   };
 }
-function editClip(clip) {
+function editClip(clip, context = {}) {
   const editing = !!clip;
+  const commentMode = !editing && context.isComment;
   const c = clip || {
     id: crypto.randomUUID(),
-    page,
-    edge: "top",
-    position: 0.78,
+    page: context.page || page,
+    edge: commentMode ? "right" : "top",
+    position: context.position ?? 0.78,
     color: clipColor,
     note: "",
+    quote: context.quote?.slice(0, 5000) || "",
   };
+  const quotePreview = c.quote
+    ? `<blockquote class="selected-quote">“${esc(c.quote.slice(0, 500))}${c.quote.length > 500 ? "…" : ""}”</blockquote>`
+    : "";
   const d = dialog(
-    editing ? "A note worth keeping." : "Mark a little moment.",
-    `<p class="muted">A physical bookmark for page ${c.page}. Drag it along the page edge to find its perfect place.</p><label class="field-label">CLIP FINISH</label><div class="clip-palette">${[
+    commentMode
+      ? "Add a comment"
+      : editing
+        ? "A note worth keeping."
+        : "Mark a little moment.",
+    `${quotePreview}<p class="muted">${commentMode ? `Comment on the selected passage on page ${c.page}.` : `A physical bookmark for page ${c.page}. Drag it along the page edge to find its perfect place.`}</p><label class="field-label">CLIP FINISH</label><div class="clip-palette">${[
       ["#b9c6ce", "Silver"],
       ["#d1ac58", "Gold"],
       ["#c64d54", "Crimson"],
@@ -1040,8 +1279,8 @@ function editClip(clip) {
       )
       .join(
         "",
-      )}</div><label class="field-label" for="clipEdge">PAGE EDGE</label><select id="clipEdge" class="full-input"><option value="top">Top edge</option><option value="right">Right outer edge</option><option value="bottom">Bottom edge</option></select><label class="field-label" for="clipNote">LABEL / NOTE</label><textarea id="clipNote" rows="3" maxlength="1000" placeholder="A thought, a quote, something to come back to…">${esc(c.note)}</textarea>`,
-    ` ${editing ? '<button id="deleteClip" class="secondary danger">Remove clip</button>' : ""}<button id="saveClip" class="primary">${editing ? "Save note" : "Attach paperclip"}</button>`,
+      )}</div><label class="field-label" for="clipEdge">PAGE EDGE</label><select id="clipEdge" class="full-input"><option value="top">Top edge</option><option value="right">Right outer edge</option><option value="bottom">Bottom edge</option></select><label class="field-label" for="clipNote">${commentMode ? "COMMENT" : "LABEL / NOTE"}</label><textarea id="clipNote" rows="3" maxlength="1000" placeholder="${commentMode ? "Write a comment on this passage…" : "A thought, a quote, something to come back to…"}">${esc(c.note)}</textarea>`,
+    ` ${editing ? '<button id="deleteClip" class="secondary danger">Remove clip</button>' : ""}<button id="saveClip" class="primary">${editing ? "Save note" : commentMode ? "Save comment" : "Attach paperclip"}</button>`,
   );
   $("#clipEdge").value = c.edge;
   let color = c.color;
@@ -1055,10 +1294,16 @@ function editClip(clip) {
       }),
   );
   $("#saveClip").onclick = () => {
+    const note = $("#clipNote").value.trim();
+    if (commentMode && !note) {
+      toast("Write a comment before saving it.");
+      return;
+    }
     Object.assign(c, {
       color,
       edge: $("#clipEdge").value,
-      note: $("#clipNote").value,
+      note,
+      quote: c.quote || "",
     });
     clipColor = color;
     if (!editing) state.paperclips.push(c);
@@ -1067,7 +1312,13 @@ function editClip(clip) {
     renderTabs();
     updateFilmMarkers();
     scheduleSave();
-    toast(editing ? "Note saved." : "A little moment, saved.");
+    toast(
+      editing
+        ? "Note saved."
+        : commentMode
+          ? "Comment saved with its passage."
+          : "A little moment, saved.",
+    );
   };
   if (editing)
     $("#deleteClip").onclick = () => {
@@ -1149,7 +1400,7 @@ function showClips() {
   openDrawer(
     "Little things, kept.",
     "Your paperclips, notes & highlighted pages.",
-    `<div class="drawer-stat"><strong>${clips.length}</strong><span>paperclips</span><strong>${highlights.length}</strong><span>marked pages</span></div><button id="drawerAddClip" class="secondary full">${icon("plus")} Clip this page</button><div class="notes-list">${clips.map((c) => `<button class="note-card" data-clip="${c.id}"><span class="note-clip">${clipSVG(c.color)}</span><div><small>PAGE ${c.page} · ${c.edge.toUpperCase()} EDGE</small><strong>${esc(c.note || "An important page")}</strong></div>${icon("arrow-up-right")}</button>`).join("") || '<div class="empty-state">No paperclips yet.<br>Keep a thought. Mark a discovery.</div>'}</div><h3 class="section-title">Highlighted pages</h3>${highlights.map(([n, s]) => `<button class="result highlight-result" data-page="${n}">${icon("highlighter")}<span>Page ${n}<small>${s.filter((x) => x.tool === "marker").length} highlight strokes</small></span>${icon("arrow-up-right")}</button>`).join("") || '<p class="muted">Highlight a passage to find it here later.</p>'}`,
+    `<div class="drawer-stat"><strong>${clips.length}</strong><span>paperclips</span><strong>${highlights.length}</strong><span>marked pages</span></div><button id="drawerAddClip" class="secondary full">${icon("plus")} Clip this page</button><div class="notes-list">${clips.map((c) => `<button class="note-card" data-clip="${c.id}"><span class="note-clip">${clipSVG(c.color)}</span><div><small>PAGE ${c.page} · ${c.edge.toUpperCase()} EDGE</small><strong>${esc(c.note || "An important page")}</strong>${c.quote ? `<small class="quote-preview">“${esc(c.quote.slice(0, 110))}${c.quote.length > 110 ? "…" : ""}”</small>` : ""}</div>${icon("arrow-up-right")}</button>`).join("") || '<div class="empty-state">No paperclips yet.<br>Keep a thought. Mark a discovery.</div>'}</div><h3 class="section-title">Highlighted pages</h3>${highlights.map(([n, s]) => `<button class="result highlight-result" data-page="${n}">${icon("highlighter")}<span>Page ${n}<small>${s.filter((x) => x.tool === "marker").length} highlight strokes</small></span>${icon("arrow-up-right")}</button>`).join("") || '<p class="muted">Highlight a passage to find it here later.</p>'}`,
   );
   $("#drawerAddClip").onclick = () => editClip();
   $$("[data-clip]").forEach(
@@ -1165,65 +1416,170 @@ function showClips() {
   );
   refreshIcons();
 }
+function clearSearchHighlights() {
+  window.CSS?.highlights?.delete("flipvault-search-match");
+  window.CSS?.highlights?.delete("flipvault-search-current");
+}
 function showSearch() {
-  openDrawer(
-    "Find a thought.",
-    "Search every word, across your entire book.",
-    `<div class="search-box">${icon("search")}<input id="searchInput" placeholder="A word, a phrase, a little idea…" aria-label="Search book text" autofocus></div><div id="searchStatus" class="muted search-status">Type at least 2 characters to search.</div><div id="searchResults"></div>`,
-  );
-  $("#searchInput").focus();
-  let timer;
-  $("#searchInput").oninput = () => {
-    clearTimeout(timer);
-    searchToken++;
-    timer = setTimeout(
-      () => searchBook($("#searchInput").value.trim()).catch(fail),
-      250,
-    );
-  };
+  const bar = $("#readerSearch");
+  bar.hidden = false;
+  document.body.classList.add("search-open");
+  $("#selectionMenu").hidden = true;
+  $("#moreSelection").setAttribute("aria-expanded", "false");
+  const input = $("#searchInput");
+  input.focus();
+  input.select();
+  if (searchQuery) input.value = searchQuery;
+}
+function closeSearch() {
+  searchToken++;
+  searchQuery = "";
+  searchHits = [];
+  activeSearchHit = -1;
+  $("#readerSearch").hidden = true;
+  document.body.classList.remove("search-open");
+  $("#searchInput").value = "";
+  $("#searchStatus").textContent = "0 of 0";
+  $("#previousSearchHit").disabled = true;
+  $("#nextSearchHit").disabled = true;
+  $("#selectSearchHit").disabled = true;
+  clearSearchHighlights();
+  if (!textSelection) {
+    for (const layer of [$("#textLayer"), $("#leftTextLayer")]) {
+      activeTextLayers.set(layer, (activeTextLayers.get(layer) || 0) + 1);
+      layer.replaceChildren();
+    }
+  }
 }
 async function pageText(n) {
   if (!textCache.has(n)) {
-    const p = await pdf.getPage(n),
-      content = await p.getTextContent();
-    textCache.set(n, content.items.map((i) => i.str).join(" "));
+    const pdfPage = await pdf.getPage(n);
+    const content = await pdfPage.getTextContent();
+    textCache.set(n, {
+      items: content.items.filter((item) => typeof item.str === "string"),
+      text: canonicalPageText(content.items),
+    });
   }
   return textCache.get(n);
 }
-async function searchBook(query) {
-  const token = ++searchToken;
-  if (query.length < 2) {
-    $("#searchResults").innerHTML = "";
-    $("#searchStatus").textContent = "Type at least 2 characters to search.";
+async function navigateSearchHit(index) {
+  if (!searchHits.length) return;
+  activeSearchHit = (index + searchHits.length) % searchHits.length;
+  const hit = searchHits[activeSearchHit];
+  $("#searchStatus").textContent =
+    `${activeSearchHit + 1} of ${searchHits.length}`;
+  $("#previousSearchHit").disabled = false;
+  $("#nextSearchHit").disabled = false;
+  $("#selectSearchHit").disabled = false;
+  if (hit.page !== page) await go(hit.page, false, false);
+  if (hit.page !== page) return;
+  const layer = $("#textLayer");
+  if (Number(layer.dataset.page) !== page || !layer.childNodes.length) {
+    const entry = await getPageCanvas(page);
+    await renderTextLayer(page, entry, layer);
+  }
+  applySearchHighlights();
+  const occurrenceOnPage = searchHits
+    .slice(0, activeSearchHit)
+    .filter((match) => match.page === hit.page).length;
+  const active = rangesForTextMatches($("#textLayer"), searchQuery)[
+    occurrenceOnPage
+  ];
+  if (active?.range) {
+    const rect = active.range.getBoundingClientRect();
+    const viewport = $("#bookViewport").getBoundingClientRect();
+    if (rect.top < viewport.top + 90 || rect.bottom > viewport.bottom - 30)
+      active.range.startContainer.parentElement.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+  }
+}
+async function selectSearchHit() {
+  const index = activeSearchHit;
+  const hit = searchHits[index];
+  if (!hit) return;
+  if (hit.page !== page) await navigateSearchHit(index);
+  await toggleTextSelection(true);
+  const occurrenceOnPage = searchHits
+    .slice(0, index)
+    .filter((match) => match.page === hit.page).length;
+  const ranges = rangesForTextMatches($("#textLayer"), searchQuery);
+  const match = ranges[occurrenceOnPage] || ranges[0];
+  if (!match?.range) {
+    toast("This match cannot be selected as text in this document.");
     return;
   }
-  $("#searchResults").innerHTML = "";
-  let matches = 0;
-  for (let n = 1; n <= pdf.numPages; n++) {
-    if (token !== searchToken) return;
-    const text = await pageText(n);
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx >= 0) {
-      matches++;
-      const start = Math.max(0, idx - 55),
-        end = Math.min(text.length, idx + query.length + 90);
-      const el = document.createElement("button");
-      el.className = "result";
-      el.innerHTML = `<span class="result-page">${n}</span><span>${esc(text.slice(start, idx))}<mark>${esc(text.slice(idx, idx + query.length))}</mark>${esc(text.slice(idx + query.length, end))}</span>${icon("arrow-up-right")}`;
-      el.onclick = async () => {
-        await go(n);
-        $("#rightPage").classList.remove("search-pulse");
-        void $("#rightPage").offsetWidth;
-        $("#rightPage").classList.add("search-pulse");
-      };
-      $("#searchResults").append(el);
-    }
-    $("#searchStatus").textContent =
-      `${matches} matching pages · searched ${n} / ${pdf.numPages}`;
-    if (n % 6 === 0) await new Promise((r) => setTimeout(r, 0));
-  }
-  refreshIcons();
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(match.range);
+  closeSearch();
+  updateSelectionActions();
 }
+async function searchBook(query) {
+  const token = ++searchToken;
+  searchQuery = query;
+  searchHits = [];
+  activeSearchHit = -1;
+  clearSearchHighlights();
+  if (!query) {
+    $("#searchStatus").textContent = "0 of 0";
+    return;
+  }
+
+  const activePdf = pdf;
+  $("#searchStatus").textContent = `Searching 0 / ${pdf.numPages}`;
+  for (let n = 1; n <= pdf.numPages; n++) {
+    if (token !== searchToken || activePdf !== pdf) return;
+    const { text } = await pageText(n);
+    for (const match of findTextMatches(text, query))
+      searchHits.push({ page: n, ...match });
+    $("#searchStatus").textContent =
+      `Searching ${n} / ${pdf.numPages} · ${searchHits.length} found`;
+    if (n % 4 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  if (token !== searchToken || activePdf !== pdf) return;
+  if (!searchHits.length) {
+    $("#searchStatus").textContent = "0 of 0 · No matches";
+    $("#previousSearchHit").disabled = true;
+    $("#nextSearchHit").disabled = true;
+    return;
+  }
+  await navigateSearchHit(0);
+}
+
+let searchInputTimer;
+$("#searchInput").oninput = () => {
+  clearTimeout(searchInputTimer);
+  searchToken++;
+  searchQuery = $("#searchInput").value.trim();
+  searchHits = [];
+  activeSearchHit = -1;
+  $("#searchStatus").textContent = searchQuery ? "Searching…" : "0 of 0";
+  $("#previousSearchHit").disabled = true;
+  $("#nextSearchHit").disabled = true;
+  $("#selectSearchHit").disabled = true;
+  clearSearchHighlights();
+  searchInputTimer = setTimeout(() => searchBook(searchQuery).catch(fail), 160);
+};
+$("#searchInput").onkeydown = (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    navigateSearchHit(activeSearchHit + (event.shiftKey ? -1 : 1)).catch(fail);
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    closeSearch();
+  }
+};
+$("#searchTop").onclick = showSearch;
+$("#focusSearch").onclick = showSearch;
+$("#closeSearch").onclick = closeSearch;
+$("#previousSearchHit").onclick = () =>
+  navigateSearchHit(activeSearchHit - 1).catch(fail);
+$("#nextSearchHit").onclick = () =>
+  navigateSearchHit(activeSearchHit + 1).catch(fail);
+$("#selectSearchHit").onclick = () => selectSearchHit().catch(fail);
 function toggleMenu(id, show) {
   const pop = $("#popover");
   if (!pop.hidden && pop.dataset.owner === id) {
@@ -1677,7 +2033,7 @@ function updateFocusFilmstrip() {
 function showFocusTools() {
   const panel = $("#focusPanel"),
     button = $("#focusTools");
-  panel.innerHTML = `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Minimize reader tools">${icon("minus")}</button></div><div class="focus-tools-grid"><button data-focus="hand">${icon("hand")}<span>Read</span></button><button data-focus="selectText">${icon("type")}<span>Select & copy</span></button><button data-focus="marker">${icon("highlighter")}<span>Marker</span></button><button data-focus="eraser">${icon("eraser")}<span>Eraser</span></button><button data-focus="bookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="focusFilmstrip" aria-pressed="${document.body.classList.contains("focus-filmstrip")}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button data-focus="zoom-out">${icon("minus")}<span>Zoom out</span></button><button data-focus="zoom-in">${icon("plus")}<span>Zoom in</span></button><button data-focus="sound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button data-focus="search">${icon("search")}<span>Search book</span></button><button data-focus="more">${icon("ellipsis")}<span>More options</span></button><button data-focus="tutorial">${icon("circle-help")}<span>App guide</span></button></div>`;
+  panel.innerHTML = `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Minimize reader tools">${icon("minus")}</button></div><div class="focus-tools-grid"><button data-focus="hand">${icon("hand")}<span>Read</span></button><button data-focus="selectText">${icon("type")}<span>Select & copy</span></button><button data-focus="marker">${icon("highlighter")}<span>Marker</span></button><button data-focus="eraser">${icon("eraser")}<span>Eraser</span></button><button data-focus="bookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="focusFilmstrip" aria-pressed="${document.body.classList.contains("focus-filmstrip")}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button data-focus="page">${icon("book-open")}<span>Go to page</span></button><button data-focus="zoom-out">${icon("minus")}<span>Zoom out</span></button><button data-focus="zoom-in">${icon("plus")}<span>Zoom in</span></button><button data-focus="sound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button data-focus="search">${icon("search")}<span>Search book</span></button><button data-focus="more">${icon("ellipsis")}<span>More options</span></button><button data-focus="tutorial">${icon("circle-help")}<span>App guide</span></button></div>`;
   panel.hidden = false;
   button.setAttribute("aria-expanded", "true");
   $("#minimizeFocusTools").onclick = () => {
@@ -1702,6 +2058,30 @@ function showFocusTools() {
         case "bookmark":
           editClip();
           break;
+        case "page": {
+          const pageDialog = dialog(
+            "Go to page",
+            `<p class="muted">Enter a page from 1 to ${pdf.numPages}.</p><label class="field-label" for="focusPageInput">PAGE NUMBER</label><input id="focusPageInput" class="full-input" type="number" min="1" max="${pdf.numPages}" value="${page}">`,
+            `<button id="cancelFocusPage" class="secondary">Cancel</button><button id="goToFocusPage" class="primary">Go to page</button>`,
+          );
+          $("#focusPageInput").focus();
+          $("#focusPageInput").select();
+          $("#cancelFocusPage").onclick = () => pageDialog.close();
+          $("#goToFocusPage").onclick = run(async () => {
+            const target = Number($("#focusPageInput").value);
+            if (
+              !Number.isInteger(target) ||
+              target < 1 ||
+              target > pdf.numPages
+            ) {
+              toast(`Choose a page from 1 to ${pdf.numPages}.`);
+              return;
+            }
+            await go(target);
+            pageDialog.close();
+          });
+          break;
+        }
         case "zoom-in":
           await setZoom(zoom + 0.25);
           break;
@@ -1811,7 +2191,12 @@ async function prepareCurl(g) {
     await pointerEnd(g.releaseEvent, g.canceled);
 }
 const surface = $("#bookSurface");
-surface.addEventListener("contextmenu", (e) => e.preventDefault());
+surface.addEventListener("contextmenu", (e) => {
+  if (e.target.closest(".text-layer")) return;
+  e.preventDefault();
+  if (!textSelection && matchMedia("(max-width: 700px)").matches)
+    selectTextAtPoint(e.clientX, e.clientY).catch(fail);
+});
 surface.addEventListener(
   "pointerdown",
   run(async (e) => {

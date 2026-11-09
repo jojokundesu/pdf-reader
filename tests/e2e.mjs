@@ -196,13 +196,47 @@ try {
   assert.equal(await p.locator(".physical-clip").count(), 1);
   assert.equal((await state()).pageAnnotations[2].length, 1);
   console.log("PASS exact page, clips and ink restored after reload");
-  await p.locator("#search").click();
+  await p.locator("#searchTop").click();
+  assert.equal(await p.locator("#readerSearch").isVisible(), true);
   await p.locator("#searchInput").fill("attention");
-  await p.waitForFunction(
-    () => document.querySelectorAll("#searchResults .result").length > 0,
+  await p.waitForFunction(() =>
+    /^1 of [1-9][0-9]*$/.test(
+      document.querySelector("#searchStatus").textContent,
+    ),
   );
-  await p.locator("#closeDrawer").click();
-  console.log("PASS full text search");
+  const searchCount = Number(
+    (await p.locator("#searchStatus").textContent()).split(" of ")[1],
+  );
+  assert.ok(searchCount > 0);
+  await p.waitForFunction(
+    () => CSS.highlights.get("flipvault-search-current")?.size > 0,
+  );
+  assert.ok(
+    await p.evaluate(
+      () => CSS.highlights.get("flipvault-search-current")?.size > 0,
+    ),
+    "the current exact text occurrence receives its own highlight",
+  );
+  if (searchCount > 1) {
+    await p.locator("#nextSearchHit").click();
+    await p.waitForFunction(() =>
+      document.querySelector("#searchStatus").textContent.startsWith("2 of "),
+    );
+  }
+  assert.equal(await p.locator("#selectSearchHit").isEnabled(), true);
+  await p.locator("#selectSearchHit").click();
+  await p.waitForFunction(
+    () => !document.querySelector("#selectionActions").hidden,
+  );
+  assert.match(
+    await p.evaluate(() => window.getSelection().toString()),
+    /^attention$/i,
+  );
+  await p.locator("#clearSelection").click();
+  assert.equal(await p.locator("#readerSearch").isVisible(), false);
+  console.log(
+    "PASS Drive-style full-document search, occurrence count, exact match highlighting and contextual actions",
+  );
   await p.locator("#vault").click();
   const backupPromise = p.waitForEvent("download");
   await p.locator("#downloadVault").click();
@@ -311,6 +345,7 @@ try {
     "marker",
     "eraser",
     "bookmark",
+    "page",
     "zoom-in",
     "zoom-out",
     "sound",
@@ -375,8 +410,53 @@ try {
       window.__sharedSelection = payload.text;
     };
   });
+  await p.locator("#moreSelection").click();
   await p.locator("#shareSelection").click();
   assert.equal(await p.evaluate(() => window.__sharedSelection), copiedPassage);
+  await p.evaluate(() => {
+    window.__translatedUrl = "";
+    window.open = (url) => (window.__translatedUrl = url);
+  });
+  await p.locator("#translateSelection").click();
+  await p.locator("#translateLanguage").selectOption("hi");
+  await p.locator("#openTranslate").click();
+  assert.match(
+    await p.evaluate(() => window.__translatedUrl),
+    /translate\.google\.com/,
+  );
+  assert.match(await p.evaluate(() => window.__translatedUrl), /tl=hi/);
+  await p.locator("#commentSelection").click();
+  assert.match(await p.locator(".selected-quote").textContent(), /.+/);
+  await p.locator("#clipNote").fill("Comment anchored to this passage");
+  await p.locator("#saveClip").click();
+  await p.waitForFunction(async () => {
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+    });
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("readingState")
+        .objectStore("readingState")
+        .getAll();
+      request.onsuccess = () =>
+        resolve(
+          request.result.some((item) =>
+            item.paperclips.some(
+              (clip) =>
+                clip.quote && clip.note === "Comment anchored to this passage",
+            ),
+          ),
+        );
+    });
+  });
+  await p.locator("#moreSelection").click();
+  await p.locator("#selectAllSelection").click();
+  assert.ok(
+    (await p.evaluate(() => window.getSelection().toString().length)) >
+      copiedPassage.length,
+    "Select all selects the readable text on the visible page",
+  );
   await p.locator('[data-focus="selectText"]').click();
   assert.equal(
     await p.locator("#selectText").getAttribute("aria-pressed"),
@@ -627,6 +707,69 @@ try {
     "PASS source-based reading state fingerprint stays stable across re-import",
   );
 
+  await p.reload();
+  await ready();
+  assert.equal(
+    await p
+      .locator("body")
+      .evaluate((body) => body.classList.contains("focus-mode")),
+    true,
+    "phone readers open in the immersive full-screen layout",
+  );
+  assert.equal(
+    await p
+      .locator("body")
+      .evaluate((body) => body.classList.contains("focus-filmstrip")),
+    true,
+    "page thumbnails are visible by default in the phone reader",
+  );
+  assert.equal(await p.locator("#focusSearch").isVisible(), true);
+  assert.equal(await p.locator("#filmstrip").isVisible(), true);
+  assert.equal(
+    await p.locator("#selectText").getAttribute("aria-pressed"),
+    "false",
+  );
+  await p.locator("#selectText").click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#textLayer span").length > 0,
+  );
+  const sampleTextBox = await p
+    .locator("#textLayer span")
+    .filter({ hasText: /Hello/ })
+    .first()
+    .boundingBox();
+  assert.ok(
+    sampleTextBox,
+    "the imported PDF exposes a visible selectable text run",
+  );
+  await p.locator("#selectText").click();
+  await p.evaluate(
+    ({ x, y }) => {
+      document.querySelector("#pdfCanvas").dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+        }),
+      );
+    },
+    {
+      x: sampleTextBox.x + sampleTextBox.width / 2,
+      y: sampleTextBox.y + sampleTextBox.height / 2,
+    },
+  );
+  await p.waitForFunction(
+    () =>
+      document.querySelector("#selectText").getAttribute("aria-pressed") ===
+      "true",
+  );
+  await p.waitForFunction(
+    () => !document.querySelector("#selectionActions").hidden,
+  );
+  assert.ok(
+    (await p.evaluate(() => window.getSelection().toString())).length > 0,
+  );
   await p.screenshot({ path: "test-results/mobile-final.png" });
   assert.deepEqual(errors, []);
   console.log("PASS no uncaught browser errors");

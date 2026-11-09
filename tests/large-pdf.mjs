@@ -68,9 +68,11 @@ try {
     undefined,
     { timeout: 30000 },
   );
+  await page.locator("#focusTools").click();
   for (const n of [500, 1000, 1]) {
-    await page.locator("#pageInput").fill(String(n));
-    await page.locator("#pageInput").dispatchEvent("change");
+    await page.locator('[data-focus="page"]').click();
+    await page.locator("#focusPageInput").fill(String(n));
+    await page.locator("#goToFocusPage").click();
     await page.waitForFunction(
       (n) =>
         document.querySelector("#pageInput").value === String(n) &&
