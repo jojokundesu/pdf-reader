@@ -62,6 +62,41 @@ const pageNum = (n) =>
       document.querySelector("#loading").hidden,
     n,
   );
+async function dismissFirstRunTutorial() {
+  await p.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return true;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+    if (!db) return false;
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+      request.onerror = () => resolve(false);
+    });
+  });
+  if (await p.locator("#tutorialSkip").isVisible())
+    await p.locator("#tutorialSkip").click();
+  await p.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return false;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+    });
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+    });
+  });
+}
 const starts = (n) =>
   p.waitForFunction((n) => window.__pageAudio.starts.length === n, n);
 const metrics = () => p.evaluate(() => window.__pageAudio);
@@ -82,23 +117,7 @@ async function goToFocusPage(n) {
 try {
   await p.goto(process.env.TEST_URL || "http://localhost:5173");
   await ready();
-  await p.waitForTimeout(1000);
-  if (await p.locator("#dialog").isVisible())
-    await p.locator("#tutorialSkip").click();
-  await p.waitForFunction(() => !document.querySelector("#dialog").open);
-  await p.waitForFunction(async () => {
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-    });
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-    });
-  });
+  await dismissFirstRunTutorial();
   assert.equal((await metrics()).starts.length, 0);
   await p.locator("#next").click();
   await pageNum(2);
