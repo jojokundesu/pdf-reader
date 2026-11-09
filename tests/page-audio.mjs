@@ -200,7 +200,7 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
-    await p.locator("#prevSmall").click();
+    await p.locator("#prev").click();
     await pageNum(7);
     await starts(1);
     console.log(
