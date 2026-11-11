@@ -1,16 +1,24 @@
 # FlipVault Pro {{VERSION}}
 
-A private, offline PDF reading room for Android and the browser. Real 2D canvas page folds,
-non-destructive highlighting, paperclip bookmarks and a library that stays on your device.
+A private, offline reading room for Android and the browser. PDF pages retain their source rendering; supported ebooks, text and comic archives are converted locally into page-based reading copies.
 
-## What is new in 1.3.0
+> **Review candidate only — 1.4.0 is not published as a stable release.** The stable Android download remains the last approved version until this candidate has been checked and explicitly approved.
 
-- Focus mode now has a dedicated touch-friendly Reader tools panel with page bookmarks, marker, eraser, zoom, sound, search and settings, without leaving the immersive reader.
-- Page thumbnails can be opened inside focus mode; the main toolbar and exit control remain visible and readable.
-- Added a short first-use tutorial with a replay option. Help now explains touch gestures and app tools.
-- Popovers, dialogs, drawers, tool studios and the reference panel can be minimized and resumed instead of forcing the reader to close the app.
-- Fixed reverse page folds: the revealed page remains correctly oriented, with a cleaner backward-turn animation and no interim inverted rendering.
-- Verified layout, theme, background and annotation controls through browser integration tests.
+## What is new in 1.4.0
+
+- Added on-device imports for EPUB, MOBI, AZW/AZW3, CBZ/CBR, DjVu/DJV, TXT and HTML/HTM alongside PDF. No source file is uploaded. EPUB/MOBI text is reflowed into clean pages, comic archives become naturally ordered page images, and DjVu pages are rasterized.
+- Added a Select text tool for PDF text layers and reflowed text: drag to select, then use contextual Copy or Share actions. The control is also available from focus-mode Reader tools.
+- Embedded Noto Sans Latin, Bengali, Devanagari, Tamil and Telugu fonts in reflowed text documents, retaining selectable, copyable text for those scripts.
+- Reduced rendering cost on phones: lower peak canvas memory, duplicate-page-render coalescing, and a 1.6× device-pixel-ratio ceiling on small/lower-memory devices, while keeping the existing animated turn path.
+- Added browser integration coverage for Unicode TXT and EPUB, CBZ ordering, actual text-layer selection/copy, focus-mode controls and existing regression flows.
+
+### Import limits to know before testing
+
+- DRM-protected books, password-protected documents and encrypted comic archives are not supported. CBR multi-volume archives are not supported.
+- EPUB and MOBI/AZW are reflowed as text. Original CSS/layout, embedded illustrations, audio/video, interactive content and remote assets are intentionally not carried over. Scripts do not run and external resources are never fetched.
+- DjVu and comic pages are raster images; they do not gain OCR or selectable text. Search and selection work on text-based PDFs and reflowed text formats, not image-only scans.
+- Reflowed text embeds Latin, Bengali, Devanagari, Tamil and Telugu fonts. Glyphs from other writing systems may be replaced.
+- Non-PDF source files are converted for the reader and are not retained as originals. Keep a separate copy of your source files.
 
 ## What is in this release
 
@@ -29,7 +37,7 @@ IndexedDB; hosting it over HTTPS enables install-to-home-screen.
 2. Tap the file and allow installing from the browser/file manager if Android asks.
 3. Open **FlipVault Pro**. The first launch creates a 12-page sample book, _The art of paying
    attention_, so the reader is usable immediately.
-4. Use **+** on the bookshelf to import your own PDFs from device storage or a cloud provider.
+4. Use **+** to import a PDF or supported EPUB, MOBI/AZW, CBZ/CBR, DjVu, TXT or HTML file from device storage. Import is offline; converted formats have the limits listed above.
 
 Updating later: install the newer `FlipVault-Pro-Android.apk` over the top of the existing app.
 Books, notes and positions are kept, because the package name and signing certificate are unchanged
@@ -79,8 +87,8 @@ and the version code increases. No uninstall is needed.
 - Everything lives in the app: IndexedDB holds the original PDFs plus reading state, and the app
   requests persistent storage where the platform allows it.
 - The shield button downloads a `.flipvault.json` vault backup. Vaults store annotations and
-  positions, **not** PDF binaries, so keep your original PDF files and re-import them after a
-  restore; their content hashes reattach the saved notes even if filenames changed.
+  positions, **not** book binaries, so keep your original files and re-import them after a
+  restore; their source fingerprints reattach saved notes even if filenames changed.
 - On Android, enable auto-backup to write `Documents/FlipVault/Auto-backup.flipvault.json` on every
   saved change, and use the native share sheet to export annotated PDFs or a printable study
   summary.

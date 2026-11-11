@@ -62,17 +62,28 @@ const pageNum = (n) =>
       document.querySelector("#loading").hidden,
     n,
   );
-const starts = (n) =>
-  p.waitForFunction((n) => window.__pageAudio.starts.length === n, n);
-const metrics = () => p.evaluate(() => window.__pageAudio);
-try {
-  await p.goto(process.env.TEST_URL || "http://localhost:5173");
-  await ready();
-  await p.waitForTimeout(1000);
-  if (await p.locator("#dialog").isVisible())
-    await p.locator("#tutorialSkip").click();
-  await p.waitForFunction(() => !document.querySelector("#dialog").open);
+async function dismissFirstRunTutorial() {
   await p.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return true;
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open("FlipVaultDB");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+    if (!db) return false;
+    return await new Promise((resolve) => {
+      const request = db
+        .transaction("settings")
+        .objectStore("settings")
+        .get("tutorialSeen");
+      request.onsuccess = () => resolve(request.result === true);
+      request.onerror = () => resolve(false);
+    });
+  });
+  if (await p.locator("#tutorialSkip").isVisible())
+    await p.locator("#tutorialSkip").click();
+  await p.waitForFunction(async () => {
+    if (document.querySelector("#dialog")?.open) return false;
     const db = await new Promise((resolve) => {
       const request = indexedDB.open("FlipVaultDB");
       request.onsuccess = () => resolve(request.result);
@@ -85,8 +96,30 @@ try {
       request.onsuccess = () => resolve(request.result === true);
     });
   });
+}
+const starts = (n) =>
+  p.waitForFunction((n) => window.__pageAudio.starts.length === n, n);
+const metrics = () => p.evaluate(() => window.__pageAudio);
+async function toggleFocusSound() {
+  if (await p.locator("#focusPanel").isHidden())
+    await p.locator("#focusTools").click();
+  await p.locator('[data-focus="sound"]').click();
+  await p.locator("#focusTools").click();
+}
+async function goToFocusPage(n) {
+  if (await p.locator("#focusPanel").isHidden())
+    await p.locator("#focusTools").click();
+  await p.locator('[data-focus="page"]').click();
+  await p.locator("#focusPageInput").fill(String(n));
+  await p.locator("#goToFocusPage").click();
+  await pageNum(n);
+}
+try {
+  await p.goto(process.env.TEST_URL || "http://localhost:5173");
+  await ready();
+  await dismissFirstRunTutorial();
   assert.equal((await metrics()).starts.length, 0);
-  await p.locator("#nextSmall").click();
+  await p.locator("#next").click();
   await pageNum(2);
   await starts(1);
   let m = await metrics();
@@ -101,13 +134,13 @@ try {
   console.log(
     "PASS actual MP3 decoding, gesture unlock, quiet-head trimming and original-pitch playback",
   );
-  await p.locator("#nextSmall").click();
+  await p.locator("#next").click();
   await pageNum(3);
   await starts(2);
-  await p.locator("#sound").click();
+  await toggleFocusSound();
   await p.waitForTimeout(100);
   assert.equal((await metrics()).active, 0);
-  await p.locator("#nextSmall").click();
+  await p.locator("#next").click();
   await pageNum(4);
   assert.equal((await metrics()).starts.length, 2);
   assert.ok((await metrics()).stops > 0);
@@ -118,14 +151,14 @@ try {
   await ready();
   await pageNum(4);
   assert.equal(await p.locator("#sound").getAttribute("aria-pressed"), "true");
-  await p.locator("#nextSmall").click();
+  await p.locator("#next").click();
   await pageNum(5);
   assert.equal((await metrics()).starts.length, 0);
   assert.equal((await metrics()).contexts, 0);
-  await p.locator("#sound").click();
+  await toggleFocusSound();
   await p.waitForFunction(() => window.__pageAudio.decodes === 1);
   assert.equal((await metrics()).starts.length, 0);
-  await p.locator("#nextSmall").click();
+  await p.locator("#next").click();
   await pageNum(6);
   await starts(1);
   console.log(
@@ -143,9 +176,7 @@ try {
   await p.keyboard.press("ArrowLeft");
   await pageNum(5);
   await starts(2);
-  await p.locator("#pageInput").fill("8");
-  await p.locator("#pageInput").dispatchEvent("change");
-  await pageNum(8);
+  await goToFocusPage(8);
   await starts(3);
   assert.ok((await metrics()).maxActive <= 2);
   console.log("PASS no spring-back sound; direct page jumps play exactly once");
@@ -188,7 +219,7 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
-    await p.locator("#prevSmall").click();
+    await p.locator("#prev").click();
     await pageNum(7);
     await starts(1);
     console.log(

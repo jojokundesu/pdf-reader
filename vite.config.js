@@ -5,12 +5,16 @@ export default defineConfig({
   base: process.env.BASE_PATH || "/",
   server: { host: "0.0.0.0", allowedHosts: [".e2b.app"] },
   preview: { host: "0.0.0.0", allowedHosts: [".e2b.app"] },
+  // djvu-rs resolves its selected WASM binary relative to its ESM module URL.
+  // Keep it outside optimizeDeps so the dev server preserves that asset URL.
+  optimizeDeps: { exclude: ["djvu-rs"] },
   build: {
     rollupOptions: {
       output: {
         manualChunks: {
           pdfjs: ["pdfjs-dist/legacy/build/pdf.mjs"],
           pdflib: ["pdf-lib"],
+          fontkit: ["@pdf-lib/fontkit"],
         },
       },
     },

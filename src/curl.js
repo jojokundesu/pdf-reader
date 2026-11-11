@@ -118,6 +118,11 @@ export class PageCurl {
   }
   release(complete, onfinish) {
     cancelAnimationFrame(this.drawFrame);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.cancel();
+      onfinish(complete);
+      return;
+    }
     this.drawFrame = 0;
     const dest = {
       x: complete

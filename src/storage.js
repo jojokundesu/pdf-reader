@@ -175,7 +175,9 @@ export function validateState(s) {
       c.position > 1 ||
       !validColor(c.color) ||
       typeof c.note !== "string" ||
-      c.note.length > 10000
+      c.note.length > 10000 ||
+      (c.quote !== undefined &&
+        (typeof c.quote !== "string" || c.quote.length > 5000))
     )
       bad();
   }
