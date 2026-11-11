@@ -571,9 +571,24 @@ try {
         },
       },
     });
+    // The reader falls back to execCommand("copy") when the clipboard API is
+    // refused, so catch that path as well.
+    document.addEventListener(
+      "copy",
+      () => {
+        window.__copiedSelection = String(document.getSelection());
+      },
+      true,
+    );
   });
   await p.locator("#copySelection").click();
-  assert.equal(await p.evaluate(() => window.__copiedSelection), copiedPassage);
+  const clipboardText = await p
+    .waitForFunction(() => window.__copiedSelection || null, null, {
+      timeout: 8000,
+    })
+    .then((handle) => handle.jsonValue())
+    .catch(() => "");
+  assert.equal(clipboardText, copiedPassage, "Copy puts the selection on the clipboard");
   await p.evaluate(() => {
     window.__sharedSelection = null;
     navigator.share = async (payload) => {
@@ -582,7 +597,13 @@ try {
   });
   await p.locator("#moreSelection").click();
   await p.locator("#shareSelection").click();
-  assert.equal(await p.evaluate(() => window.__sharedSelection), copiedPassage);
+  const sharedText = await p
+    .waitForFunction(() => window.__sharedSelection || null, null, {
+      timeout: 8000,
+    })
+    .then((handle) => handle.jsonValue())
+    .catch(() => "");
+  assert.equal(sharedText, copiedPassage, "Share hands the selection to Android");
   await p.evaluate(() => {
     window.__translatedUrl = "";
     window.open = (url) => (window.__translatedUrl = url);
