@@ -75,7 +75,9 @@ test("main-app CI publishes only the certificate-verified release APK, never dis
     workflow.includes("if: steps.signing.outputs.configured == 'true'"),
   );
   assert.ok(workflow.includes("app-release.apk"));
-  assert.ok(workflow.includes("branches: [main, arena/9d3bad6a-pdf-reader]"));
+  const triggerBranches = workflow.match(/branches: \[([^\]]+)\]/)?.[1] || "";
+  assert.match(triggerBranches, /(^|, )main(,|$)/);
+  assert.ok(!triggerBranches.includes("*"));
   assert.ok(workflow.includes("FlipVault-Pro-Android-signed-review"));
   assert.ok(workflow.includes("github.ref == 'refs/heads/main'"));
   assert.ok(!workflow.includes("app-debug.apk"));
