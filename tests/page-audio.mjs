@@ -49,6 +49,27 @@ await context.addInitScript(() => {
     }
   };
 });
+// The app now opens on the library; this suite needs the reader open.
+async function enterReader() {
+  await p.waitForFunction(
+    () => {
+      const home = document.body.classList.contains("at-home");
+      return (
+        document.querySelector("#loading").hidden &&
+        (!home || document.querySelectorAll("#homeGrid .home-book").length > 0) &&
+        (home || document.querySelectorAll(".thumb").length)
+      );
+    },
+    null,
+    { timeout: 40000 },
+  );
+  await dismissFirstRunTutorial();
+  if (await p.evaluate(() => document.body.classList.contains("at-home"))) {
+    await p.locator("#homeContinueButton").waitFor({ state: "visible", timeout: 20000 });
+    await p.locator("#homeContinueButton").click();
+    await p.waitForFunction(() => !document.body.classList.contains("at-home"));
+  }
+}
 const ready = () =>
   p.waitForFunction(
     () =>
@@ -116,8 +137,8 @@ async function goToFocusPage(n) {
 }
 try {
   await p.goto(process.env.TEST_URL || "http://localhost:5173");
+  await enterReader();
   await ready();
-  await dismissFirstRunTutorial();
   assert.equal((await metrics()).starts.length, 0);
   await p.locator("#next").click();
   await pageNum(2);

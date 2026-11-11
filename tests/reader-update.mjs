@@ -11,6 +11,27 @@ const browser = await launch(),
 const p = await context.newPage(),
   errors = [];
 p.on("pageerror", (e) => errors.push(e.message));
+// The app now opens on the library; this suite needs the reader open.
+async function enterReader() {
+  await p.waitForFunction(
+    () => {
+      const home = document.body.classList.contains("at-home");
+      return (
+        document.querySelector("#loading").hidden &&
+        (!home || document.querySelectorAll("#homeGrid .home-book").length > 0) &&
+        (home || document.querySelectorAll(".thumb").length)
+      );
+    },
+    null,
+    { timeout: 40000 },
+  );
+  await dismissFirstRunTutorial();
+  if (await p.evaluate(() => document.body.classList.contains("at-home"))) {
+    await p.locator("#homeContinueButton").waitFor({ state: "visible", timeout: 20000 });
+    await p.locator("#homeContinueButton").click();
+    await p.waitForFunction(() => !document.body.classList.contains("at-home"));
+  }
+}
 const ready = () =>
   p.waitForFunction(
     () =>
@@ -110,8 +131,8 @@ async function backgroundChoice(id) {
 }
 try {
   await p.goto(process.env.TEST_URL || "http://localhost:5173");
+  await enterReader();
   await ready();
-  await dismissFirstRunTutorial();
   const black = () =>
     p.locator("#stage").evaluate((el) => getComputedStyle(el).backgroundColor);
   assert.equal(await black(), "rgb(0, 0, 0)");
@@ -191,34 +212,47 @@ try {
   await p.locator("#rtlToggle").uncheck();
   await p.locator("#layout").click();
   console.log("PASS RTL reverses interior-swipe navigation");
-  await p.locator("#zoomIn").click();
-  await p.waitForTimeout(600);
+  assert.equal(
+    await p.locator("#zoomIn, #zoomOut, #zoomValue, #marker, #eraser, #hand").count(),
+    0,
+    "the zoom readout, marker, eraser and hand tools are gone",
+  );
+  const spread = await p.locator("#rightPage").boundingBox();
+  const centre = {
+    x: spread.x + spread.width * 0.5,
+    y: spread.y + spread.height * 0.4,
+  };
+  const zoomNow = () =>
+    p.locator("#bookSurface").evaluate((el) => el.style.getPropertyValue("--zoom"));
+  await p.mouse.dblclick(centre.x, centre.y, { delay: 80 });
+  await p.waitForTimeout(700);
+  assert.equal(await zoomNow(), "2", "double-tap zooms in without zoom buttons");
   await drag();
-  await p.waitForTimeout(300);
-  assert.equal(await num(), "3");
-  assert.equal(await p.locator("#zoomValue").textContent(), "125%");
-  await p.locator("#zoomValue").click();
-  await p.waitForTimeout(600);
-  await p.locator("#marker").click();
-  await drag({ hold: 0, dx: -0.25 });
-  await p.waitForTimeout(500);
-  assert.equal(await num(), "3");
+  await p.waitForTimeout(400);
+  assert.equal(await num(), "3", "a drag pans a zoomed page instead of turning it");
   assert.equal(
     await p
       .locator("#curlCanvas")
       .evaluate((el) => getComputedStyle(el).display),
     "none",
   );
-  await p.locator("#hand").click();
+  await p.mouse.dblclick(centre.x, centre.y, { delay: 80 });
+  await p.waitForTimeout(700);
+  assert.equal(await zoomNow(), "1", "double-tap returns the page to fit");
   console.log(
-    "PASS drawing and zoomed panning remain separate from page turns",
+    "PASS double-tap zoom pans instead of turning pages, and the removed tools stay gone",
   );
   await p.screenshot({ path: "test-results/black-background-mobile.png" });
   await p.setViewportSize({ width: 1280, height: 1000 });
-  await p.waitForTimeout(700);
+  await p.waitForFunction(
+    () => document.querySelector("#bookSurface").classList.contains("spread"),
+    null,
+    { timeout: 20000 },
+  );
+  await p.waitForTimeout(500);
   await drag({ leaf: "#leftPage" });
-  await waitPage(4);
-  console.log("PASS interior drag on the left leaf of a desktop spread");
+  await waitPage(2);
+  console.log("PASS dragging the left leaf of a desktop spread turns back a page");
   await p.reload();
   await ready();
   assert.equal(await black(), "rgb(0, 0, 0)");

@@ -20,9 +20,13 @@ p.on("console", (m) => {
 const url = process.env.TEST_URL || "http://localhost:5173";
 const ready = () =>
   p.waitForFunction(
-    () =>
-      document.querySelector("#loading")?.hidden &&
-      document.querySelectorAll(".thumb").length > 0,
+    () => {
+      const home = document.body.classList.contains("at-home");
+      return (
+        document.querySelector("#loading")?.hidden &&
+        (home || document.querySelectorAll(".thumb").length > 0)
+      );
+    },
     { timeout: 30000 },
   );
 const pageNum = (n) =>
@@ -51,7 +55,13 @@ try {
     timeout: 10000,
   });
   await p.waitForTimeout(150);
-  assert.equal(await p.locator(".thumb").count(), 12);
+  assert.equal(
+    await p.locator("body").evaluate((el) => el.classList.contains("at-home")),
+    true,
+    "a first launch lands on the library, not inside the reader",
+  );
+  assert.equal(await p.locator("#homeGrid .home-book").count(), 1);
+  assert.equal(await p.locator("#homeContinueButton").isVisible(), true);
   assert.equal(await p.locator("#dialog").isVisible(), true);
   assert.match(
     await p.locator("#dialog h2").textContent(),
@@ -64,11 +74,16 @@ try {
   await p.locator("#tutorialNext").click();
   assert.match(
     await p.locator("#dialog h2").textContent(),
-    /Settle in your way/,
+    /Keep what matters/,
   );
   await p.locator("#tutorialBack").click();
   await p.locator("#tutorialNext").click();
   await p.locator("#tutorialSkip").click();
+  await p.locator("#homeContinueButton").click();
+  await p.waitForFunction(() => !document.body.classList.contains("at-home"));
+  await ready();
+  await p.waitForFunction(() => document.querySelectorAll(".thumb").length === 12);
+  assert.equal(await p.locator(".thumb").count(), 12);
   await p.locator("#theme").click();
   assert.equal(await p.locator("#popover").isVisible(), true);
   await p.locator("#minimizePopover").click();
@@ -103,11 +118,16 @@ try {
     false,
   );
   await p.locator("#library").click();
-  await p.waitForSelector("#drawer:not([hidden])");
-  await p.locator("#minimizeDrawer").click();
-  assert.equal(await p.locator("#resumeDrawer").isVisible(), true);
-  await p.locator("#resumeDrawer").click();
-  await p.locator("#closeDrawer").click();
+  await p.waitForFunction(() => document.body.classList.contains("at-home"));
+  assert.equal(await p.locator("#homeGrid .home-book").count(), 1);
+  assert.equal(await p.locator("#homeContinue").isVisible(), true);
+  const homeProgress = await p
+    .locator("#homeContinue .home-progress span")
+    .evaluate((el) => el.style.width);
+  assert.match(homeProgress, /%$/);
+  await p.locator("#homeContinueButton").click();
+  await p.waitForFunction(() => !document.body.classList.contains("at-home"));
+  await ready();
   await p.locator("#more").click();
   await p.locator("#referenceTool").click();
   await p.waitForFunction(() => !document.querySelector("#reference").hidden);
@@ -116,7 +136,13 @@ try {
   assert.equal(await p.locator("#resumeReference").isVisible(), true);
   await p.locator("#resumeReference").click();
   assert.equal(await p.locator("#referenceCanvas").isVisible(), true);
+  const refBox = await p.locator("#reference").boundingBox();
+  assert.ok(
+    refBox && refBox.x >= 0 && refBox.y >= 0 && refBox.x + refBox.width <= 1440,
+    "the reference panel opens fully inside the window",
+  );
   await p.locator("#closeReference").click();
+  assert.equal(await p.locator("#reference").isVisible(), false);
   await p.locator("#more").click();
   await p.locator("#focusTimer").click();
   assert.match(await p.locator("#sessionLabel").textContent(), /FOCUS/);
@@ -150,40 +176,49 @@ try {
   await p.locator("#rtlToggle").uncheck();
   await p.locator('[data-mode="auto"]').click();
   await p.waitForTimeout(400);
-  await p.locator("#marker").click();
   let r = await p.locator("#rightPage").boundingBox();
   const pdfBefore = await p
     .locator("#pdfCanvas")
     .evaluate((c) => c.toDataURL());
-  await p.mouse.move(r.x + r.width * 0.2, r.y + r.height * 0.35);
+  await p.locator("#selectText").click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#textLayer span").length > 2,
+  );
+  const firstSpan = await p.locator("#textLayer span").first().boundingBox();
+  const lastSpan = await p.locator("#textLayer span").last().boundingBox();
+  assert.ok(firstSpan && lastSpan, "page text layer exposes selectable runs");
+  await p.mouse.move(firstSpan.x + 2, firstSpan.y + firstSpan.height / 2);
   await p.mouse.down();
-  await p.mouse.move(r.x + r.width * 0.7, r.y + r.height * 0.35, { steps: 15 });
+  await p.mouse.move(
+    lastSpan.x + lastSpan.width - 2,
+    lastSpan.y + lastSpan.height / 2,
+    { steps: 12 },
+  );
   await p.mouse.up();
+  await p.waitForFunction(
+    () => !document.querySelector("#selectionActions").hidden,
+  );
+  assert.ok(
+    (await p.locator("#selectionCount").getAttribute("title")).length > 3,
+    "dragging the page text produces a real selection",
+  );
+  assert.ok(
+    (await p.locator("#selectionLayer .selection-rect").count()) > 0,
+    "the selection is painted over the exact words",
+  );
+  await p.locator("#highlightSelection").click();
+  await p.waitForFunction(
+    () => document.querySelectorAll("#highlightLayer .text-highlight").length > 0,
+  );
   await p.waitForTimeout(600);
-  assert.equal((await state()).pageAnnotations[2].length, 1);
+  assert.equal((await state()).textHighlights[2].length, 1);
   assert.equal(
     await p.locator("#pdfCanvas").evaluate((c) => c.toDataURL()),
     pdfBefore,
   );
-  console.log("PASS independent marker layer and saved vector stroke");
-  await p.locator("#undo").click();
-  await p.waitForTimeout(500);
-  assert.equal((await state()).pageAnnotations[2].length, 0);
-  await p.locator("#redo").click();
-  await p.waitForTimeout(500);
-  assert.equal((await state()).pageAnnotations[2].length, 1);
-  console.log("PASS undo / redo");
-  await p.locator("#eraser").click();
-  await p.mouse.move(r.x + r.width * 0.45, r.y + r.height * 0.35);
-  await p.mouse.down();
-  await p.mouse.move(r.x + r.width * 0.5, r.y + r.height * 0.35, { steps: 5 });
-  await p.mouse.up();
-  assert.equal(
-    await p.locator("#pdfCanvas").evaluate((c) => c.toDataURL()),
-    pdfBefore,
+  console.log(
+    "PASS select-to-highlight keeps the PDF byte-identical and skips marker/eraser tools",
   );
-  await p.locator("#undo").click();
-  console.log("PASS precision eraser leaves PDF byte-identical");
   await p.locator("#addClip").click();
   await p.locator("#clipNote").fill("Important insight");
   await p.locator("#saveClip").click();
@@ -192,10 +227,29 @@ try {
   console.log("PASS paperclip and all-book edge tab");
   await p.reload();
   await ready();
+  assert.equal(
+    await p.evaluate(() => document.querySelector("#dialog").open),
+    false,
+    "the welcome tour never comes back after the first time it was dismissed",
+  );
+  await p.waitForFunction(
+    () => !document.body.classList.contains("at-home"),
+    null,
+    { timeout: 20000 },
+  );
+  assert.equal(
+    await p.evaluate(() => document.body.classList.contains("at-home")),
+    false,
+    "a WebView reload while reading resumes the same book instead of the library",
+  );
   await pageNum(2);
   assert.equal(await p.locator(".physical-clip").count(), 1);
-  assert.equal((await state()).pageAnnotations[2].length, 1);
-  console.log("PASS exact page, clips and ink restored after reload");
+  assert.equal((await state()).textHighlights[2].length, 1);
+  assert.ok(
+    (await p.locator("#highlightLayer .text-highlight").count()) > 0,
+    "saved highlights are painted again after a reload",
+  );
+  console.log("PASS exact page, clips and highlights restored after reload");
   await p.locator("#searchTop").click();
   assert.equal(await p.locator("#readerSearch").isVisible(), true);
   await p.locator("#searchInput").fill("attention");
@@ -209,13 +263,41 @@ try {
   );
   assert.ok(searchCount > 0);
   await p.waitForFunction(
-    () => CSS.highlights.get("flipvault-search-current")?.size > 0,
+    () => document.querySelector("#searchLayer .search-rect.current"),
+  );
+  const hitGeometry = await p.evaluate(() => {
+    const current = document.querySelector("#searchLayer .search-rect.current");
+    const walker = document.createTreeWalker(
+      document.querySelector("#textLayer"),
+      NodeFilter.SHOW_TEXT,
+    );
+    let node, range = null;
+    while ((node = walker.nextNode())) {
+      const index = node.nodeValue.toLowerCase().indexOf("attention");
+      if (index >= 0) {
+        range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + 9);
+        break;
+      }
+    }
+    if (!range) return null;
+    const box = current.getBoundingClientRect();
+    const word = range.getBoundingClientRect();
+    return {
+      dx: Math.abs(box.left + box.width / 2 - (word.left + word.width / 2)),
+      dy: Math.abs(box.top + box.height / 2 - (word.top + word.height / 2)),
+      widthRatio: box.width / word.width,
+    };
+  });
+  assert.ok(hitGeometry, "the current match is painted as a rectangle");
+  assert.ok(
+    hitGeometry.dx < 3 && hitGeometry.dy < 3,
+    `search highlight sits on the matched word (dx ${hitGeometry.dx.toFixed(1)}, dy ${hitGeometry.dy.toFixed(1)})`,
   );
   assert.ok(
-    await p.evaluate(
-      () => CSS.highlights.get("flipvault-search-current")?.size > 0,
-    ),
-    "the current exact text occurrence receives its own highlight",
+    hitGeometry.widthRatio > 0.8 && hitGeometry.widthRatio < 1.2,
+    "search highlight has the same width as the matched word",
   );
   if (searchCount > 1) {
     await p.locator("#nextSearchHit").click();
@@ -229,9 +311,34 @@ try {
     () => !document.querySelector("#selectionActions").hidden,
   );
   assert.match(
-    await p.evaluate(() => window.getSelection().toString()),
+    await p.locator("#selectionCount").getAttribute("title"),
     /^attention$/i,
   );
+  assert.ok(
+    (await p.locator("#selectionLayer .selection-rect").count()) > 0,
+    "a search hit becomes a real painted selection",
+  );
+  await p.locator("#meaningSelection").click();
+  await p.waitForFunction(
+    () => document.querySelector(".meaning-entry, .dialog-body .fine-print"),
+    null,
+    { timeout: 25000 },
+  );
+  assert.ok(
+    (await p.locator(".meaning-entry .meaning-pos").count()) > 0,
+    "Meaning resolves the selected word in the bundled offline dictionary",
+  );
+  assert.match(
+    await p.locator(".meaning-entry h3").first().textContent(),
+    /attention/i,
+  );
+  assert.ok(
+    (await p.locator("#dialog .fine-print").textContent()).includes(
+      "Offline WordNet",
+    ),
+    "the dictionary panel makes clear it is offline",
+  );
+  await p.locator("#closeMeaning").click();
   await p.locator("#clearSelection").click();
   assert.equal(await p.locator("#readerSearch").isVisible(), false);
   console.log(
@@ -266,11 +373,10 @@ try {
     await p.evaluate(() => document.documentElement.scrollWidth),
     393,
   );
-  await p.locator("#hand").click();
   r = await p.locator("#rightPage").boundingBox();
   await p.mouse.move(r.x + r.width - 2, r.y + r.height * 0.85);
   await p.mouse.down();
-  await p.waitForTimeout(120);
+  await p.waitForTimeout(250);
   await p.mouse.move(r.x + r.width * 0.28, r.y + r.height * 0.8, { steps: 12 });
   assert.equal(
     await p.locator("#curlCanvas").evaluate((c) => getComputedStyle(c).display),
@@ -302,36 +408,49 @@ try {
     delay: 80,
   });
   await p.waitForTimeout(500);
-  assert.equal(await p.locator("#zoomValue").textContent(), "200%");
-  await p.locator("#zoomValue").click();
-  await p.waitForTimeout(450);
+  assert.equal(
+    await p.locator("#bookSurface").evaluate((el) => el.style.getPropertyValue("--zoom")),
+    "2",
+    "double-tap zooms in",
+  );
+  const readZoom = () =>
+    p
+      .locator("#bookSurface")
+      .evaluate((el) => Number(el.style.getPropertyValue("--zoom")));
   const cdp = await context.newCDPSession(p);
-  r = await p.locator("#rightPage").boundingBox();
-  const cx = r.x + r.width * 0.5,
-    cy = r.y + r.height * 0.5;
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [
-      { x: cx - 30, y: cy, id: 1 },
-      { x: cx + 30, y: cy, id: 2 },
-    ],
-  });
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [
-      { x: cx - 60, y: cy, id: 1 },
-      { x: cx + 60, y: cy, id: 2 },
-    ],
-  });
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchEnd",
-    touchPoints: [],
-  });
+  const center = await p.evaluate(() => ({
+    x: innerWidth / 2,
+    y: innerHeight / 2,
+  }));
+  const pinch = async (from, to) => {
+    const cx = center.x,
+      cy = center.y;
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [
+        { x: cx - from, y: cy, id: 1 },
+        { x: cx + from, y: cy, id: 2 },
+      ],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: cx - to, y: cy, id: 1 },
+        { x: cx + to, y: cy, id: 2 },
+      ],
+    });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await p.waitForTimeout(500);
+  };
+  await pinch(30, 60);
+  assert.ok(
+    (await readZoom()) > 2,
+    "pinching zooms in without zoom buttons",
+  );
+  await p.mouse.dblclick(center.x, center.y, { delay: 80 });
   await p.waitForTimeout(500);
-  assert.equal(await p.locator("#zoomValue").textContent(), "200%");
-  await p.locator("#zoomValue").click();
-  await p.waitForTimeout(450);
-  console.log("PASS double-tap and multi-touch pinch zoom");
+  assert.equal(await readZoom(), 1, "double-tapping again returns the page to fit");
+  console.log("PASS double-tap and multi-touch pinch zoom without zoom buttons");
   await p.locator("#focus").click();
   assert.equal(await p.locator("#exitFocus").isVisible(), true);
   assert.equal(await p.locator("#focusTools").isVisible(), true);
@@ -340,18 +459,13 @@ try {
   assert.equal(await p.locator("#focusTools svg").count(), 1);
   assert.equal(await p.locator('[data-focus="bookmark"] svg').count(), 1);
   for (const id of [
-    "hand",
     "selectText",
-    "marker",
-    "eraser",
     "bookmark",
     "page",
-    "zoom-in",
-    "zoom-out",
     "sound",
-    "search",
     "more",
     "tutorial",
+    "home",
   ])
     assert.equal(
       await p.locator(`[data-focus="${id}"]`).count(),
@@ -360,14 +474,18 @@ try {
     );
   assert.equal(await p.locator("#focusFilmstrip").count(), 1);
   assert.equal(await p.locator('[data-focus="selectText"]').count(), 1);
+  const openFocusTools = async () => {
+    if (await p.locator("#focusPanel").isVisible()) return;
+    await p.locator("#focusTools").click();
+    await p.waitForFunction(
+      () => document.querySelector("#focusPanel").hidden === false,
+    );
+  };
   await p.locator('[data-focus="bookmark"]').click();
   assert.equal(await p.locator("#dialog").isVisible(), true);
   assert.equal(await p.locator("#clipNote").count(), 1);
   await p.locator("#closeDialog").click();
-  await p.locator('[data-focus="marker"]').click();
-  assert.equal(await p.locator("#studio").isVisible(), true);
-  await p.locator('[data-focus="eraser"]').click();
-  assert.equal(await p.locator("#studio").isVisible(), true);
+  await openFocusTools();
   await p.locator('[data-focus="selectText"]').click();
   await p.waitForFunction(
     () => document.querySelectorAll("#textLayer span").length > 0,
@@ -376,21 +494,73 @@ try {
     await p.locator("#selectText").getAttribute("aria-pressed"),
     "true",
   );
-  const copiedPassage = await p.evaluate(() => {
-    const span = [...document.querySelectorAll("#textLayer span")].find(
-      (node) => node.textContent.trim().length > 3,
-    );
-    const range = document.createRange();
-    range.selectNodeContents(span);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-    return selection.toString();
-  });
+  const findWord = () =>
+    p.evaluate(() => {
+      const blocked = [
+        ...document.querySelectorAll("#highlightLayer .text-highlight"),
+      ].map((el) => el.getBoundingClientRect());
+      const overlaps = (r) =>
+        blocked.some(
+          (b) =>
+            r.left < b.right &&
+            r.right > b.left &&
+            r.top < b.bottom &&
+            r.bottom > b.top,
+        );
+      let widest = null;
+      for (const span of document.querySelectorAll("#textLayer span")) {
+        const rect = span.getBoundingClientRect();
+        if (rect.width < 8 || rect.height < 2) continue;
+        if (rect.bottom < 8 || rect.top > innerHeight - 8) continue;
+        if (overlaps(rect)) continue;
+        if (!widest || rect.width > widest.width)
+          widest = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      }
+      return widest;
+    });
+  // The text layer is rebuilt asynchronously, so wait for both the raster and
+  // the selectable spans before tapping a word.
   await p.waitForFunction(
-    () => !document.querySelector("#selectionActions").hidden,
+    () => {
+      const loading = document.querySelector("#loading");
+      if (loading && !loading.hidden) return false;
+      return [...document.querySelectorAll("#textLayer span")].some((span) => {
+        const rect = span.getBoundingClientRect();
+        return (
+          rect.width >= 8 &&
+          rect.height >= 2 &&
+          rect.bottom > 8 &&
+          rect.top < innerHeight - 8
+        );
+      });
+    },
+    null,
+    { timeout: 20000 },
   );
-  assert.ok(copiedPassage.length > 3);
+  let selected = false;
+  for (let attempt = 0; attempt < 3 && !selected; attempt++) {
+    const box = await findWord();
+    if (!box) {
+      await p.waitForTimeout(250);
+      continue;
+    }
+    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await p.mouse.down();
+    await p.mouse.up();
+    selected = await p
+      .waitForFunction(
+        () => !document.querySelector("#selectionActions").hidden,
+        null,
+        { timeout: 3000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+  }
+  assert.ok(selected, "tapping a word opens the selection bar");
+  const copiedPassage = await p
+    .locator("#selectionCount")
+    .getAttribute("title");
+  assert.ok(copiedPassage.length > 0, "tapping a word selects it");
   await p.evaluate(() => {
     window.__copiedSelection = "";
     Object.defineProperty(navigator, "clipboard", {
@@ -453,10 +623,16 @@ try {
   await p.locator("#moreSelection").click();
   await p.locator("#selectAllSelection").click();
   assert.ok(
-    (await p.evaluate(() => window.getSelection().toString().length)) >
+    (await p.locator("#selectionCount").getAttribute("title")).length >
       copiedPassage.length,
     "Select all selects the readable text on the visible page",
   );
+  assert.ok(
+    (await p.locator("#selectionLayer .selection-rect").count()) > 1,
+    "Select all paints the whole page of text",
+  );
+  await p.locator("#clearSelection").click();
+  await openFocusTools();
   await p.locator('[data-focus="selectText"]').click();
   assert.equal(
     await p.locator("#selectText").getAttribute("aria-pressed"),
@@ -528,8 +704,12 @@ try {
   );
   await p.mouse.up();
   assert.ok(
-    (await p.evaluate(() => window.getSelection().toString())).length > 1,
+    (await p.locator("#selectionCount").getAttribute("title")).length > 1,
     "drag selection returns page text",
+  );
+  assert.ok(
+    (await p.locator("#selectionLayer .selection-rect").count()) > 0,
+    "drag selection paints overlay rectangles",
   );
   await p.locator("#selectText").click();
   console.log(
@@ -710,6 +890,15 @@ try {
   await p.reload();
   await ready();
   assert.equal(
+    await p.evaluate(() => document.body.classList.contains("at-home")),
+    true,
+    "a fresh launch opens the library home screen",
+  );
+  assert.equal(await p.locator("#homeGrid .home-book").count() > 0, true);
+  await p.locator("#homeContinueButton").click();
+  await p.waitForFunction(() => !document.body.classList.contains("at-home"));
+  await ready();
+  assert.equal(
     await p
       .locator("body")
       .evaluate((body) => body.classList.contains("focus-mode")),
@@ -768,7 +957,7 @@ try {
     () => !document.querySelector("#selectionActions").hidden,
   );
   assert.ok(
-    (await p.evaluate(() => window.getSelection().toString())).length > 0,
+    (await p.locator("#selectionCount").getAttribute("title")).length > 0,
   );
   await p.screenshot({ path: "test-results/mobile-final.png" });
   assert.deepEqual(errors, []);
@@ -778,8 +967,12 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
+    await p.locator("#homeContinueButton").click();
+    await p.waitForFunction(
+      () => document.querySelector("#bookTitle").textContent === "hindi-notes",
+      { timeout: 30000 },
+    );
     assert.equal(await p.locator("#pageInput").inputValue(), "1");
-    assert.equal(await p.locator("#bookTitle").textContent(), "hindi-notes");
     console.log("PASS offline app reload and last-imported book restoration");
   }
 } finally {

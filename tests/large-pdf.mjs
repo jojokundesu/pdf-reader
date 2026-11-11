@@ -20,41 +20,40 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(process.env.TEST_URL || "http://localhost:4173");
   await page.waitForFunction(
-    () => document.querySelectorAll(".thumb").length === 12,
+    () => {
+      const home = document.body.classList.contains("at-home");
+      return (
+        document.querySelector("#loading").hidden &&
+        (!home || document.querySelectorAll("#homeGrid .home-book").length > 0)
+      );
+    },
+    null,
+    { timeout: 40000 },
   );
-  await page.waitForFunction(async () => {
-    if (document.querySelector("#dialog")?.open) return true;
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-    });
-    if (!db) return false;
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-      request.onerror = () => resolve(false);
-    });
-  });
-  if (await page.locator("#tutorialSkip").isVisible())
-    await page.locator("#tutorialSkip").click();
-  await page.waitForFunction(async () => {
-    if (document.querySelector("#dialog")?.open) return false;
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-    });
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-    });
-  });
+  // The guided tour is shown right after the library paints; dismiss it.
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (await page.locator("#tutorialSkip").isVisible().catch(() => false)) {
+      await page.locator("#tutorialSkip").click();
+      await page.waitForFunction(() => !document.querySelector("#dialog").open);
+      break;
+    }
+    if (await page.evaluate(() => !document.querySelector("#dialog").open))
+      await page.waitForTimeout(150);
+  }
+  // The app now opens on the library; open the sample book first.
+  if (await page.evaluate(() => document.body.classList.contains("at-home"))) {
+    await page
+      .locator("#homeContinueButton")
+      .waitFor({ state: "visible", timeout: 20000 });
+    await page.locator("#homeContinueButton").click();
+  }
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(".thumb").length === 12 &&
+      document.querySelector("#loading").hidden,
+    null,
+    { timeout: 30000 },
+  );
   const started = performance.now();
   await page.locator("#pdfFile").setInputFiles({
     name: "1000-page-study.pdf",

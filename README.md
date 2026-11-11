@@ -14,15 +14,16 @@ Install the APK, open the app, and tap **+** to add your PDFs. Updates install o
 
 ## What it does
 
-- **Turn pages by dragging anywhere** on a page, not just the corners. A deliberate drag or a short flick turns the page; corner peels still work. Pinch zoom, spread layout and right-to-left reading are included.
-- **Mark up without damaging the file.** Six marker colours, adjustable brush size and opacity, straight-line mode, precision and whole-stroke erasers, and per-page undo/redo.
+- **Turn pages by dragging anywhere** on a page, not just the corners. A deliberate drag or a short flick turns the page; corner peels still work. Pinch or double-tap to zoom, with spread layout and right-to-left reading included.
+- **Select text, then highlight it.** Tap or drag across a word, sentence or paragraph, then use the app's own bar to **Highlight** (saved per book, and drawn into exported PDFs), copy, translate, comment or look up the **Meaning** in a built-in offline English dictionary with definitions, synonyms and examples. Android's native copy/translate popup is suppressed so the bar is never covered.
 - **Paperclip bookmarks** with notes, full-book bookmark tabs and a notes drawer.
-- **Full-text search** with snippets, plus a thumbnail filmstrip that flags annotated pages.
-- **Focus mode** with an always-visible reader toolbar, a touch-friendly tools panel for markers, erasers, bookmarks, zoom and sound, plus optional page thumbnails. A first-use guided tour can be replayed any time from Help. Reading-time estimates, a 20-minute reading ritual and a floating reference view are included.
+- **Full-text search** that marks the exact word on the page, with snippets, match counting and a thumbnail filmstrip that flags annotated pages.
+- **Your library first:** the app opens on the bookshelf with covers, progress and a Continue-reading card, and only shows the guided tour on the very first launch. A brief minimise returns you to the same page, and the reference split view can be dragged, resized and closed.
+- **Focus mode** with an always-visible reader toolbar, a touch-friendly tools panel for selecting text, bookmarks, page jumps, sound, layout, theme and page thumbnails. Reading-time estimates and a 20-minute reading ritual are included.
 - **Pure black background** by default, with charcoal, forest and warm-brown alternatives, plus paper, sepia, AMOLED and e-ink page themes.
 - **Your data stays yours:** no account, no analytics, no cloud sync, no network requests. Export annotated PDFs or a printable study summary, and back up notes and positions to a `.flipvault.json` vault.
 
-The first launch creates a 12-page sample book locally, so the reader is usable straight away. Tap **+** to import a PDF or supported EPUB, MOBI/AZW, CBZ/CBR, DjVu, TXT or HTML book. Non-PDF formats are converted on-device; see the 1.4.0 candidate notes for reflow and image-format limits.
+The first launch creates a 12-page sample book locally, so the reader is usable straight away. Tap **+** to import a PDF or supported EPUB, MOBI/AZW, CBZ/CBR, DjVu, TXT or HTML book. Non-PDF formats are converted on-device; see the 1.5.0 candidate notes for reflow and image-format limits.
 
 ## Keep your notes safe
 
@@ -34,12 +35,16 @@ Releases are published from the `main` branch. Each one is signed with a permane
 
 Older preview builds were signed with temporary debug keys. Android cannot update those in place: uninstall one of them once, install the release above, then restore your vault and re-import your PDFs. Do that only after exporting a backup. Details are in [docs/android-signing.md](docs/android-signing.md).
 
-## 1.4.0 candidate · ready for review
+## 1.5.0 candidate · ready for review
 
 This is a review build on a separate branch, **not a stable release**. The Android download above remains the last approved release until the changes here are tested and explicitly approved. The optional **FlipVault Preview** APK is a separate install with its own library; it cannot replace or update FlipVault Pro.
 
-- **Smoother reading on mid-range phones:** bounded canvas memory, a 3.2-megapixel render budget on lower-memory devices, duplicate-render coalescing, and a capped 1.6× device-pixel ratio on phones to reduce heat and battery use while preserving crisp page turns. System reduced-motion preferences skip the spring animation.
-- **Select, copy and share page text:** turn on **Select text**, drag across selectable PDF text, then use the contextual Copy or Share actions. The same tool is available in the focus-mode Reader tools panel.
+- **Highlights straight from the text you select:** tapping or dragging across page text now offers **Highlight** alongside copy, translate, comment and share. Highlights persist with the book, survive reloads and are baked into exported PDFs. The marker and eraser tools - and the zoom +/- buttons with their percentage readout - are gone; pinch and double-tap are the whole zoom story.
+- **Meaning, offline:** the new action looks selected words up in a dictionary bundled with the app (146,000 English headwords, definitions, synonyms and examples). It never calls the network, and it is English-only for now.
+- **Android's own copy/translate popup no longer covers the app bar.** Selection is handled by the reader itself, so the actions you see are the actions that work.
+- **The library is the front door:** books, covers, progress and a Continue-reading card come first, the guided tour appears only on a true first launch, and a WebView reload after a brief minimise reopens the book where you left it.
+- **Focus mode fits a phone:** the reader tools panel now carries layout, theme and page position, thumbnails can be toggled, and every control stays on screen.
+- **Reference split view fixes:** drag it by its header, resize it from the corner grip, minimise or close it - it no longer stays stuck on top until a restart.
 - **More books, imported privately:** PDF, EPUB, MOBI/AZW/AZW3, CBZ/CBR, DjVu/DJV, TXT and HTML/HTM can be added from device storage. Conversion is performed on-device with no upload. EPUB/MOBI/AZW text is reflowed into simple pages; HTML scripts and remote resources are not run or fetched. Comic pages are sorted naturally by filename. DjVu and comic pages are raster pages.
 - **Better offline reading language support:** imported text embeds Noto Sans Latin, Bengali, Devanagari, Tamil and Telugu fonts; PDFs with selectable text keep their source text and layout.
 - **Regression coverage:** verified TXT/EPUB Unicode imports, comic archive ordering, text selection and copy/share controls, focus-mode access, and the existing reader, vault and export flows.
@@ -52,12 +57,16 @@ Found an issue or want a format or tool considered? Open an issue in this reposi
 
 ```sh
 npm ci
-npm run dev        # development server on 0.0.0.0
-npm test           # geometry, storage and signing unit tests
+npm run dev        # development server on 0.0.0.0 (builds the dictionary first)
+npm test           # geometry, storage, selection and signing unit tests
+npm run dictionary # rebuild public/dictionary from WordNet (git-ignored, ~25 MB)
 npm run build      # production bundle and offline service worker
-npx cap sync android && cd android && ./gradlew :app:assembleRelease
+npm run android:sync   # build, then copy the web assets + plugins into android/
+cd android && ./gradlew :app:assembleRelease
 ```
 
-The web build runs in any current browser and can be installed from the browser menu. The Android app packages the same reader, so no connection is needed for reading. Automated tests cover page-turn gestures, annotation tools, search, backup and restore, offline reload, PDF export and a synthetic 1,000-page import. Android release builds are compiled in CI, and the signing certificate is checked before anything is published.
+The offline dictionary is generated at build time from the `wordnet` dev dependency into `public/dictionary/`, so it is never committed. `npm run dev` and `npm run build` run the generator automatically; run `npm run dictionary` by hand only after changing the generator. After `npm install` adds or updates a Capacitor plugin (for example `@capacitor/app`, which handles Android resume and "Open with" links), `npm run android:sync` must run before building the APK, otherwise the native project keeps the old plugin list.
+
+The web build runs in any current browser and can be installed from the browser menu. The Android app packages the same reader, so no connection is needed for reading. Automated tests cover page-turn gestures, text selection and highlighting, search-hit alignment, dictionary lookup, the library and resume flows, backup and restore, offline reload, PDF export and a synthetic 1,000-page import. Android release builds are compiled in CI, and the signing certificate is checked before anything is published.
 
 Apache-2.0. PDF.js, pdf-lib, JSZip, the MOBI and DjVu/RAR readers, Lucide and Capacitor retain their own licenses. Embedded Noto Sans fonts are OFL-1.1; the license is included in `public/licenses/Noto-Sans-OFL.txt`.

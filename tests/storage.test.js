@@ -81,3 +81,41 @@ test("malformed or hostile backup data is rejected before writes", async () => {
   );
   await assert.rejects(restoreVault({ format: "Other", states: [] }));
 });
+
+test("saved text highlights validate, and legacy stroke states still restore", () => {
+  const highlights = {
+    ...state,
+    pageAnnotations: undefined,
+    textHighlights: {
+      7: [
+        {
+          id: "h-1",
+          color: "#ffe066",
+          text: "A passage worth keeping.",
+          rects: [{ x: 0.1, y: 0.2, w: 0.5, h: 0.03 }],
+          createdAt: Date.now(),
+        },
+      ],
+    },
+  };
+  assert.equal(validateState(highlights), true);
+  assert.equal(validateState({ ...state, textHighlights: {} }), true);
+  assert.throws(() =>
+    validateState({
+      ...highlights,
+      textHighlights: { 7: [{ ...highlights.textHighlights[7][0], color: "yellow" }] },
+    }),
+  );
+  assert.throws(() =>
+    validateState({
+      ...highlights,
+      textHighlights: { 7: [{ ...highlights.textHighlights[7][0], rects: [{ x: 0.9, y: 0, w: 4, h: 1 }] }] },
+    }),
+  );
+  assert.throws(() =>
+    validateState({
+      ...highlights,
+      textHighlights: { 7: [{ ...highlights.textHighlights[7][0], text: "x".repeat(5001) }] },
+    }),
+  );
+});

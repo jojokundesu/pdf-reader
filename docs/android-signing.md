@@ -104,6 +104,8 @@ Both `SHA256` values must match. **Stop if they differ.** Do not change the pinn
 
 ## Local builds
 
+Run `npm ci && npm run build && npx cap sync android` before Gradle. The sync step copies the web bundle **and** the Capacitor plugin list into the native project: 1.5.0 adds `@capacitor/app` (resume handling and "Open with" links) and the Android "Open with" intent filters, and a Gradle build that skips the sync ships without them.
+
 `android/app/build.gradle` reads the same four values from the environment (`FLIPVAULT_ANDROID_KEYSTORE_PATH`, `FLIPVAULT_ANDROID_STORE_PASSWORD`, `FLIPVAULT_ANDROID_KEY_ALIAS`, `FLIPVAULT_ANDROID_KEY_PASSWORD`) through your own secret manager. Without them, Gradle produces an unsigned release — it never generates a replacement signing identity.
 
 ## Optional side-by-side test build

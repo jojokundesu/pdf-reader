@@ -136,12 +136,13 @@ export function validateState(s) {
     !/^[0-9a-f]{64}$/.test(s.pdfHash) ||
     !Number.isInteger(s.lastPage) ||
     s.lastPage < 1 ||
-    !s.pageAnnotations ||
-    typeof s.pageAnnotations !== "object" ||
-    Array.isArray(s.pageAnnotations) ||
     !Array.isArray(s.paperclips)
   )
     bad();
+  const annotations = s.pageAnnotations ?? {};
+  if (typeof annotations !== "object" || Array.isArray(annotations)) bad();
+  const highlights = s.textHighlights ?? {};
+  if (typeof highlights !== "object" || Array.isArray(highlights)) bad();
   if (
     s.zoomLevel !== undefined &&
     (!finite(s.zoomLevel) || s.zoomLevel < 1 || s.zoomLevel > 4)
@@ -159,7 +160,8 @@ export function validateState(s) {
     bad();
   if (
     s.paperclips.length > 10000 ||
-    Object.keys(s.pageAnnotations).length > 10000
+    Object.keys(annotations).length > 10000 ||
+    Object.keys(highlights).length > 10000
   )
     bad();
   for (const c of s.paperclips) {
@@ -181,7 +183,40 @@ export function validateState(s) {
     )
       bad();
   }
-  for (const [page, strokes] of Object.entries(s.pageAnnotations)) {
+  for (const [page, items] of Object.entries(highlights)) {
+    if (!/^[1-9][0-9]*$/.test(page) || !Array.isArray(items) || items.length > 5000)
+      bad();
+    for (const item of items) {
+      if (
+        !item ||
+        typeof item.id !== "string" ||
+        item.id.length > 80 ||
+        !validColor(item.color) ||
+        typeof item.text !== "string" ||
+        item.text.length > 5000 ||
+        !Array.isArray(item.rects) ||
+        item.rects.length > 4000 ||
+        item.rects.some(
+          (r) =>
+            !r ||
+            !finite(r.x) ||
+            !finite(r.y) ||
+            !finite(r.w) ||
+            !finite(r.h) ||
+            r.x < -1 ||
+            r.y < -1 ||
+            r.w <= 0 ||
+            r.h <= 0 ||
+            r.x > 1 ||
+            r.y > 1 ||
+            r.x + r.w > 2 ||
+            r.y + r.h > 2,
+        )
+      )
+        bad();
+    }
+  }
+  for (const [page, strokes] of Object.entries(annotations)) {
     if (
       !/^[1-9][0-9]*$/.test(page) ||
       !Array.isArray(strokes) ||

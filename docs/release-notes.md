@@ -2,15 +2,20 @@
 
 A private, offline reading room for Android and the browser. PDF pages retain their source rendering; supported ebooks, text and comic archives are converted locally into page-based reading copies.
 
-> **Review candidate only — 1.4.0 is not published as a stable release.** The stable Android download remains the last approved version until this candidate has been checked and explicitly approved.
+> **Review candidate only — 1.5.0 is not published as a stable release.** The 1.4.0 build on `main` stays the approved download until this candidate has been checked on a device and explicitly approved. The optional **FlipVault Preview** APK is a separate install with its own library and cannot update FlipVault Pro.
 
-## What is new in 1.4.0
+## What is new in 1.5.0
 
-- Added on-device imports for EPUB, MOBI, AZW/AZW3, CBZ/CBR, DjVu/DJV, TXT and HTML/HTM alongside PDF. No source file is uploaded. EPUB/MOBI text is reflowed into clean pages, comic archives become naturally ordered page images, and DjVu pages are rasterized.
-- Added a Select text tool for PDF text layers and reflowed text: drag to select, then use contextual Copy or Share actions. The control is also available from focus-mode Reader tools.
-- Embedded Noto Sans Latin, Bengali, Devanagari, Tamil and Telugu fonts in reflowed text documents, retaining selectable, copyable text for those scripts.
-- Reduced rendering cost on phones: lower peak canvas memory, duplicate-page-render coalescing, and a 1.6× device-pixel-ratio ceiling on small/lower-memory devices, while keeping the existing animated turn path.
-- Added browser integration coverage for Unicode TXT and EPUB, CBZ ordering, actual text-layer selection/copy, focus-mode controls and existing regression flows.
+- **Highlight from text selection.** Tap or drag across a word, sentence or paragraph and choose **Highlight**. Highlights are saved with the book, redrawn after a reload and included in exported PDFs. The marker, eraser, zoom +/-, zoom percentage, duplicate "Search book" and "Read" tools are gone, along with the "Install on your device" menu entry.
+- **Meaning, fully offline.** A new selection action looks words up in a dictionary built into the app: 146,000 English headwords with definitions, synonyms and examples. Nothing is fetched from the network. English only for now.
+- **The app's own selection bar wins.** Page text is selected by the reader with the native text-selection menu suppressed, so Android's floating Copy/Translate popup can no longer sit on top of Copy, Highlight, Meaning, Translate, Comment and More.
+- **Library first.** The app opens on the bookshelf with covers, progress and a Continue-reading card. The welcome tour appears only on a true first launch and closing it retires it for good.
+- **Resume after a brief minimise.** Position and progress are saved every time Android pauses the app, and a WebView reload reopens the same book instead of dropping you back to the shelf.
+- **Search marks the exact word.** Search overlays are projected from the real text ranges, so a hit is painted on the word it matched and follow-up actions apply to that hit.
+- **Focus mode fits a phone.** Reader tools now include layout, theme and page position, keep every button on screen, and no longer hide the three-dot menu behind a dragged layout.
+- **Reference split view is usable:** drag it by the header, resize it from the corner grip, minimise it, or close it with its own X. It no longer floats unclosable until the app restarts.
+- **Android "Open with" support.** PDFs shared from a file manager, Downloads or a mail attachment can open directly in FlipVault through a new intent filter and content-URI import path.
+- **Regression coverage:** the browser suite now exercises select-to-highlight, dictionary lookup, search-hit alignment, first-run library landing, resume-after-reload, reference panel geometry, mobile focus tools and the existing vault, export and import flows, plus new unit coverage for saved highlight validation.
 
 ### Import limits to know before testing
 
@@ -19,6 +24,8 @@ A private, offline reading room for Android and the browser. PDF pages retain th
 - DjVu and comic pages are raster images; they do not gain OCR or selectable text. Search and selection work on text-based PDFs and reflowed text formats, not image-only scans.
 - Reflowed text embeds Latin, Bengali, Devanagari, Tamil and Telugu fonts. Glyphs from other writing systems may be replaced.
 - Non-PDF source files are converted for the reader and are not retained as originals. Keep a separate copy of your source files.
+- The dictionary is English-only and covers common dictionary headwords and inflections; proper nouns, technical jargon and inflected forms outside its word list may return no entry.
+- Android "Open with" import has not been verified on a physical device in this candidate; if the chooser entry is missing on your phone, open the app and use **+** to import instead.
 
 ## What is in this release
 
