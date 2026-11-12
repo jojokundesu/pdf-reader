@@ -15,15 +15,16 @@ Install the APK, open the app, and tap **+** to add your PDFs. Updates install o
 ## What it does
 
 - **Turn pages by dragging anywhere** on a page, not just the corners. A deliberate drag or a short flick turns the page; corner peels still work. Pinch or double-tap to zoom, with spread layout and right-to-left reading included.
-- **Select text, then highlight it.** Tap or drag across a word, sentence or paragraph, then use the app's own bar to **Highlight** (saved per book, and drawn into exported PDFs), copy, translate, comment or look up the **Meaning** in a built-in offline English dictionary with definitions, synonyms and examples. Android's native copy/translate popup is suppressed so the bar is never covered.
+- **Select text the standard way.** Press and hold a word to select it, keep dragging to extend the selection, then use the app's own bar to **Highlight** (saved per book, and drawn into exported PDFs), copy, translate, comment or look up the **Meaning** in a built-in offline English dictionary with definitions, synonyms and examples. Android's native copy/translate popup is suppressed so the bar is never covered.
 - **Paperclip bookmarks** with notes, full-book bookmark tabs and a notes drawer.
 - **Full-text search** that marks the exact word on the page, with snippets, match counting and a thumbnail filmstrip that flags annotated pages.
 - **Your library first:** the app opens on the bookshelf with covers, progress and a Continue-reading card, and only shows the guided tour on the very first launch. A brief minimise returns you to the same page, and the reference split view can be dragged, resized and closed.
-- **Focus mode** with an always-visible reader toolbar, a touch-friendly tools panel for selecting text, bookmarks, page jumps, sound, layout, theme and page thumbnails. Reading-time estimates and a 20-minute reading ritual are included.
-- **Pure black background** by default, with charcoal, forest and warm-brown alternatives, plus paper, sepia, AMOLED and e-ink page themes.
+- **Reader tools in the top bar:** find, reader tools and exit focus are icon buttons, and the tools panel carries layout, theme, background, page thumbnails, go to page, bookmarks, reference, sound, the reading timer, fullscreen, the guide and the library. There is no three-dot menu and there are no arrows beside the page — swipe, use the arrow keys, or type a page number. Reading-time estimates and a 20-minute reading ritual are included.
+- **Reading-room backgrounds, built in.** Choose one of the eleven artwork backgrounds that ship inside the app — nine reading rooms for the library, two wooden desks behind the pages — or add your own image or a PDF page. Keep one fixed or let **Advanced** change it each time the app opens, and dim the artwork so text stays readable. Anything smaller than 800 × 800 px, or too wide or tall, is refused with the reason.
+- **Pure black surroundings** by default, with charcoal, forest and warm-brown alternatives, plus paper, sepia, aged cream, mocha, slate night, AMOLED dark and e-ink page themes for night reading.
 - **Your data stays yours:** no account, no analytics, no cloud sync, no network requests. Export annotated PDFs or a printable study summary, and back up notes and positions to a `.flipvault.json` vault.
 
-The first launch creates a 12-page sample book locally, so the reader is usable straight away. Tap **+** to import a PDF or supported EPUB, MOBI/AZW, CBZ/CBR, DjVu, TXT or HTML book. Non-PDF formats are converted on-device; see the 1.5.0 candidate notes for reflow and image-format limits.
+The first launch creates a 12-page sample book locally, so the reader is usable straight away. Tap **+** to import a PDF or supported EPUB, MOBI/AZW, CBZ/CBR, DjVu, TXT or HTML book. Non-PDF formats are converted on-device; see the 1.6.0 candidate notes for reflow and image-format limits.
 
 ## Keep your notes safe
 
@@ -35,15 +36,18 @@ Releases are published from the `main` branch. Each one is signed with a permane
 
 Older preview builds were signed with temporary debug keys. Android cannot update those in place: uninstall one of them once, install the release above, then restore your vault and re-import your PDFs. Do that only after exporting a backup. Details are in [docs/android-signing.md](docs/android-signing.md).
 
-## 1.5.0 candidate · ready for review
+## 1.6.0 candidate · ready for review
 
 This is a review build on a separate branch, **not a stable release**. The Android download above remains the last approved release until the changes here are tested and explicitly approved. The optional **FlipVault Preview** APK is a separate install with its own library; it cannot replace or update FlipVault Pro.
 
-- **Highlights straight from the text you select:** tapping or dragging across page text now offers **Highlight** alongside copy, translate, comment and share. Highlights persist with the book, survive reloads and are baked into exported PDFs. The marker and eraser tools - and the zoom +/- buttons with their percentage readout - are gone; pinch and double-tap are the whole zoom story.
+- **Selection is the standard long-press-and-drag.** Hold a word to select it, drag to extend the selection word by word, and the app's own bar offers **Highlight** alongside copy, translate, comment and share. Highlights persist with the book, survive reloads and are baked into exported PDFs. The marker and eraser tools - and the zoom +/- buttons with their percentage readout - are gone; pinch and double-tap are the whole zoom story.
 - **Meaning, offline:** the new action looks selected words up in a dictionary bundled with the app (146,000 English headwords, definitions, synonyms and examples). It never calls the network, and it is English-only for now.
 - **Android's own copy/translate popup no longer covers the app bar.** Selection is handled by the reader itself, so the actions you see are the actions that work.
 - **The library is the front door:** books, covers, progress and a Continue-reading card come first, the guided tour appears only on a true first launch, and a WebView reload after a brief minimise reopens the book where you left it.
 - **Focus mode fits a phone:** the reader tools panel now carries layout, theme and page position, thumbnails can be toggled, and every control stays on screen.
+- **Reader options in one place:** find, reader tools and exit focus are icon buttons in the top bar, the three-dot menu is gone, and the arrows beside the page are gone — page turns are swipes, arrow keys or a typed page number. The thumbnail strip follows the page you are reading.
+- **Reading-room artwork ships with the app:** the eleven backgrounds taken from the two artwork sheets are bundled inside the APK, so they work offline with no import. Pick one for the library, the reading room or both, keep it fixed or change it on every launch, and dim it so text stays readable. Uploaded artwork is checked before it is stored — anything under 800 × 800 px, too wide or too tall is refused with the reason.
+- **Night reading is easier on the eyes:** Warm parchment is retuned and the dark side gains Dark cream, Mocha and Slate night alongside AMOLED dark and e-ink contrast.
 - **Reference split view fixes:** drag it by its header, resize it from the corner grip, minimise or close it - it no longer stays stuck on top until a restart.
 - **More books, imported privately:** PDF, EPUB, MOBI/AZW/AZW3, CBZ/CBR, DjVu/DJV, TXT and HTML/HTM can be added from device storage. Conversion is performed on-device with no upload. EPUB/MOBI/AZW text is reflowed into simple pages; HTML scripts and remote resources are not run or fetched. Comic pages are sorted naturally by filename. DjVu and comic pages are raster pages.
 - **Better offline reading language support:** imported text embeds Noto Sans Latin, Bengali, Devanagari, Tamil and Telugu fonts; PDFs with selectable text keep their source text and layout.

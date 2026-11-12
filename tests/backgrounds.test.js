@@ -61,4 +61,19 @@ test("rotation picks from the chosen set and avoids repeating the last image", (
     picks.add(pickArtwork(rotating, "reader", null).id);
   assert.deepEqual([...picks].sort(), [a.id, b.id].sort());
   assert.equal(pickArtwork({ images: [] }, "home"), null);
+
+  // Built-in artwork joins the pool: a surface can point at a shipped picture
+  // that is not in the reader's own image list, and rotation can walk both.
+  const builtin = { id: "builtin-desk-oak", name: "Dark oak desk" };
+  const uploaded = { id: "art-upload" };
+  const pool = [builtin, uploaded];
+  assert.equal(
+    pickArtwork({ images: [], reader: builtin.id }, "reader", null, pool).id,
+    builtin.id,
+  );
+  const rotatingPool = { images: [], reader: builtin.id, rotate: true };
+  const seen = new Set();
+  for (let i = 0; i < 40; i++)
+    seen.add(pickArtwork(rotatingPool, "reader", null, pool).id);
+  assert.deepEqual([...seen].sort(), [builtin.id, uploaded.id].sort());
 });

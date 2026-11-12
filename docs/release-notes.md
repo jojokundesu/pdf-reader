@@ -2,11 +2,21 @@
 
 A private, offline reading room for Android and the browser. PDF pages retain their source rendering; supported ebooks, text and comic archives are converted locally into page-based reading copies.
 
-> **Review candidate only — 1.5.0 is not published as a stable release.** The 1.4.0 build on `main` stays the approved download until this candidate has been checked on a device and explicitly approved. The optional **FlipVault Preview** APK is a separate install with its own library and cannot update FlipVault Pro.
+> **Review candidate only — 1.6.0 is not published as a stable release.** The 1.4.0 build on `main` stays the approved download until this candidate has been checked on a device and explicitly approved. The optional **FlipVault Preview** APK is a separate install with its own library and cannot update FlipVault Pro.
 
-## What is new in 1.5.0
+## What is new in 1.6.0
 
-- **Highlight from text selection.** Tap or drag across a word, sentence or paragraph and choose **Highlight**. Highlights are saved with the book, redrawn after a reload and included in exported PDFs. The marker, eraser, zoom +/-, zoom percentage, duplicate "Search book" and "Read" tools are gone, along with the "Install on your device" menu entry.
+- **Selection works the way every other reader works.** Press and hold a word and that word is selected; keep dragging and the selection grows word by word. Releasing keeps it, tapping elsewhere clears it, and the double-tap/triple-tap word and sentence shortcuts are gone along with every selection mode switch in the options.
+- **Reader options live in one place.** Reader tools now hold layout, theme, background, page thumbnails, go to page, bookmark, reference, sound, timer, fullscreen, guide, tour and library. The top bar is three icons — find, reader tools and exit focus — and the three-dot menu is gone because there is nothing left behind it.
+- **No arrows beside the page.** Page turns are swipes, the arrow keys, or typing a page number; the floating left/right arrows, the first/last buttons and the footer chevrons are removed.
+- **Thumbnails follow you.** The filmstrip scrolls to keep the page you are reading in view instead of staying parked on page one, in both the desktop footer and the phone filmstrip.
+- **Reading-room artwork, included.** The two artwork sheets in the repository ship inside the app as eleven built-in backgrounds — nine reading rooms for the library and two wooden desks for the reading room — so they are available offline and need no import. Choose your own image or a PDF page instead if you prefer; anything under 800 × 800 px, too wide or too tall is refused with the reason. **Advanced** keeps one picture fixed or changes it every time the app is opened, and the artwork can be dimmed so text stays readable.
+- **Better dark themes.** Warm parchment was washed out for night reading, so the dark side now has Dark cream (warm, low glare), Mocha, Slate night and AMOLED dark, each with a matching stage tint. The page keeps its own colour; the surround changes.
+- **Reading data is backed up as before, and backed up sooner.** The vault still carries how far you read, bookmarks, highlights, paperclips and notes; a page turn is now written within a fraction of a second, so a reload or a crash lands on the page you were actually on.
+
+### What was new in 1.5.0
+
+- **Highlight from text selection.** Select text and choose **Highlight**. Highlights are saved with the book, redrawn after a reload and included in exported PDFs. The marker, eraser, zoom +/-, zoom percentage, duplicate "Search book" and "Read" tools are gone, along with the "Install on your device" menu entry.
 - **Meaning, fully offline.** A new selection action looks words up in a dictionary built into the app: 146,000 English headwords with definitions, synonyms and examples. Nothing is fetched from the network. English only for now.
 - **The app's own selection bar wins.** Page text is selected by the reader with the native text-selection menu suppressed, so Android's floating Copy/Translate popup can no longer sit on top of Copy, Highlight, Meaning, Translate, Comment and More.
 - **Library first.** The app opens on the bookshelf with covers, progress and a Continue-reading card. The welcome tour appears only on a true first launch and closing it retires it for good.

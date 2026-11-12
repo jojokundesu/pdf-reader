@@ -163,7 +163,8 @@ try {
   );
   console.log("PASS demo PDF and virtualized thumbnails");
   console.log("PASS production reader starts with the built-in sample book");
-  await p.locator("#nextSmall").click();
+  await p.locator("#pageInput").fill("2");
+  await p.locator("#pageInput").press("Enter");
   await pageNum(2);
   await p.locator("#layout").click();
   await p.locator('[data-mode="single"]').click();
@@ -407,7 +408,26 @@ try {
   await p.locator("#focusTools").click();
   await p.locator("#toolBackground").click();
   await p.waitForFunction(() => document.querySelector("#dialog")?.open);
-  assert.equal(await p.locator("#backgroundGrid .background-tile").count(), 1);
+  assert.equal(
+    await p.locator("#backgroundGrid .background-tile").count(),
+    3,
+    "the reading room offers two built-in desks and no background",
+  );
+  // A desk that ships with the app is applied exactly like an upload.
+  await p.locator('[data-artwork="builtin-desk-oak"]').click();
+  await p.waitForFunction(
+    () =>
+      /\/assets\//.test(
+        document.documentElement.style.getPropertyValue("--reader-art"),
+      ),
+    null,
+    { timeout: 10000 },
+  );
+  assert.equal(
+    await p.evaluate(() => document.documentElement.dataset.readerArt),
+    "on",
+    "a built-in desk is painted behind the pages",
+  );
   const artwork = (await p.evaluate(async () => {
     const canvas = document.createElement("canvas");
     canvas.width = 1200;
@@ -430,7 +450,7 @@ try {
     buffer: Buffer.from(artwork, "base64"),
   });
   await p.waitForFunction(
-    () => document.querySelectorAll("#backgroundGrid .background-tile").length === 2,
+    () => document.querySelectorAll("#backgroundGrid .background-tile").length === 4,
     null,
     { timeout: 15000 },
   );
@@ -463,6 +483,39 @@ try {
     1,
     "artwork is stored on this device and survives a reload",
   );
+  // Advanced: the picture can change on every launch, or stay put.
+  await p.locator("#artworkRotate").check();
+  await p.waitForFunction(
+    () =>
+      /greet you each time/.test(
+        document.querySelector("#toast").textContent || "",
+      ),
+    null,
+    { timeout: 10000 },
+  );
+  assert.equal(
+    await p.evaluate(async () => {
+      const db = await new Promise((resolve) => {
+        const request = indexedDB.open("FlipVaultDB");
+        request.onsuccess = () => resolve(request.result);
+      });
+      return await new Promise((resolve) => {
+        const request = db
+          .transaction("settings")
+          .objectStore("settings")
+          .get("backgroundLibrary");
+        request.onsuccess = () => resolve(request.result?.rotate === true);
+      });
+    }),
+    true,
+    "the rotate-on-open preference is stored",
+  );
+  await p.locator("#artworkRotate").uncheck();
+  await p.waitForFunction(
+    () => /will stay put/.test(document.querySelector("#toast").textContent || ""),
+    null,
+    { timeout: 10000 },
+  );
   // An image too small for a full-screen background is refused.
   const tiny = (await p.evaluate(async () => {
     const canvas = document.createElement("canvas");
@@ -488,7 +541,7 @@ try {
   );
   assert.equal(
     await p.locator("#backgroundGrid .background-tile").count(),
-    2,
+    4,
     "an image with the wrong dimensions is refused",
   );
   await p.locator("#closeBackgrounds").click();
@@ -559,7 +612,8 @@ try {
   );
   await p.mouse.up();
   await pageNum(2);
-  await p.locator("#nextSmall").click();
+  await p.locator("#pageInput").fill("3");
+  await p.locator("#pageInput").press("Enter");
   await pageNum(3);
   console.log(
     "PASS right-to-left interior drag returns to the previous page without a rendering flash",

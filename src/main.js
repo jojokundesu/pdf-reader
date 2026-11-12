@@ -135,6 +135,7 @@ import {
   pickArtwork,
   readArtworkFile,
 } from "./backgrounds.js";
+import { builtinFor } from "./artwork-library.js";
 import {
   mergeRects,
   relativeRects,
@@ -223,8 +224,8 @@ app.innerHTML = `
 <main><section id="home" class="home" aria-label="Your library"><div class="home-hero"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1><p class="home-sub">Everything you read and mark stays on this device.</p></div><div class="home-hero-actions"><button id="homeImport" class="primary home-import">${icon("plus")}<span>Add a book</span></button><button id="homeBackup" class="secondary home-backup">${icon("shield-check")}<span>Back up reading data</span></button></div></div><div id="homeContinue" class="home-continue" hidden></div><div class="home-head-row"><h2 class="home-title">Your books</h2><span id="homeCount" class="home-count"></span></div><div id="homeGrid" class="home-grid"></div></section>
 <div class="workspace-header hud"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1></div><button id="focus" class="subtle">${icon("maximize")}<span>Focus mode</span></button></div>
 <div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("addClip", "paperclip", "Attach a paperclip")}</div></div>
-<section id="stage" class="stage" aria-label="Interactive book reader"><div class="stage-ambient"></div><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><div id="leftHighlightLayer" class="text-highlight-layer" aria-hidden="true"></div><div id="leftSearchLayer" class="search-layer" aria-hidden="true"></div><div id="leftTextLayer" class="text-layer" aria-label="Selectable page text"></div><div id="leftSelectionLayer" class="selection-layer" aria-hidden="true"></div><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><div id="highlightLayer" class="text-highlight-layer"></div><div id="searchLayer" class="search-layer" aria-hidden="true"></div><div id="textLayer" class="text-layer" aria-label="Selectable page text"></div><div id="selectionLayer" class="selection-layer" aria-hidden="true"></div><div id="uiLayer" class="page-ui"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
-<footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination">${btn("first", "chevrons-left", "First page")}${btn("prevSmall", "chevron-left", "Previous page")}<label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label>${btn("nextSmall", "chevron-right", "Next page")}${btn("last", "chevrons-right", "Last page")}</div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
+<section id="stage" class="stage" aria-label="Interactive book reader"><div class="stage-ambient"></div><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><div id="leftHighlightLayer" class="text-highlight-layer" aria-hidden="true"></div><div id="leftSearchLayer" class="search-layer" aria-hidden="true"></div><div id="leftTextLayer" class="text-layer" aria-label="Selectable page text"></div><div id="leftSelectionLayer" class="selection-layer" aria-hidden="true"></div><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><div id="highlightLayer" class="text-highlight-layer"></div><div id="searchLayer" class="search-layer" aria-hidden="true"></div><div id="textLayer" class="text-layer" aria-label="Selectable page text"></div><div id="selectionLayer" class="selection-layer" aria-hidden="true"></div><div id="uiLayer" class="page-ui"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Swipe to turn the page · press and hold a word to select it</span><span id="readingTime">A little time, well spent.</span></div></section>
+<footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination"><label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label></div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
 </main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><section id="readerSearch" class="reader-search" role="search" aria-label="Search this book" hidden><button id="closeSearch" class="search-close" aria-label="Close search">${icon("x")}</button><input id="searchInput" type="search" enterkeyhint="search" placeholder="Find in this document" aria-label="Find in this document" autocomplete="off"><span id="searchStatus" class="search-status" aria-live="polite">0 of 0</span><button id="previousSearchHit" aria-label="Previous match">${icon("chevron-left")}</button><button id="nextSearchHit" aria-label="Next match">${icon("chevron-right")}</button><button id="selectSearchHit" aria-label="Actions for current match" title="Select this match for copy, highlight or meaning" disabled>⋯</button></section><div id="selectionActions" class="selection-actions" role="toolbar" aria-label="Selected text actions" hidden><span id="selectionCount">Selected text</span><button id="copySelection">Copy</button><button id="highlightSelection">Highlight</button><button id="meaningSelection">Meaning</button><button id="translateSelection">Translate</button><button id="commentSelection">Comment</button><button id="moreSelection" aria-expanded="false">More</button><button id="clearSelection" aria-label="Dismiss selection actions">×</button></div><div id="selectionMenu" class="selection-menu" hidden><button id="selectAllSelection">Select all on page</button><button id="shareSelection">Share selection</button><div class="highlight-colors" role="group" aria-label="Highlight colour"></div></div><input id="pdfFile" type="file" accept=".pdf,.epub,.mobi,.azw,.azw3,.cbz,.cbr,.djvu,.djv,.txt,.html,.htm,application/pdf,application/epub+zip,text/plain,text/html" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><input id="artworkFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><input id="artworkPdf" type="file" accept=".pdf,application/pdf" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
 function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.65 } });
@@ -2090,10 +2091,20 @@ function showThemes() {
   });
 }
 // --- reader artwork -----------------------------------------------------
+// Everything a surface can show: the built-in reading rooms and desks first,
+// then whatever the reader has added themselves.
+function artworkPool(surface) {
+  return [...builtinFor(surface), ...(artwork.images || [])];
+}
 function applyArtwork() {
   const root = document.documentElement;
   for (const surface of ["home", "reader"]) {
-    const image = pickArtwork(artwork, surface, artworkShown[surface]);
+    const image = pickArtwork(
+      artwork,
+      surface,
+      artworkShown[surface],
+      artworkPool(surface),
+    );
     artworkShown[surface] = image?.id || null;
     root.style.setProperty(
       `--${surface}-art`,
@@ -2108,7 +2119,8 @@ function applyArtwork() {
 // A new rotation is drawn once per launch and whenever the app comes back to
 // the foreground, so "change every time I open the app" means exactly that.
 function rotateArtwork() {
-  if (!artwork.rotate || artwork.images.length < 2) return;
+  if (!artwork.rotate) return;
+  if (artworkPool("home").length < 2 || artworkPool("reader").length < 2) return;
   artworkShown = { home: artworkShown.home, reader: artworkShown.reader };
   applyArtwork();
 }
@@ -2138,11 +2150,15 @@ function showBackgrounds(target = "reader") {
       <button id="addArtworkPdf" class="secondary">${icon("file")}From a PDF page</button>
       ${artwork.images.length ? `<button id="clearArtwork" class="secondary">${icon("trash-2")}Remove all</button>` : ""}
     </div>
+    <span class="menu-label">${surface === "home" ? "READING ROOMS" : "DESKS"}</span>
     <div class="background-grid" id="backgroundGrid">
       <button class="background-tile background-none" data-artwork="" aria-pressed="${!artwork[surface]}">${icon("ban")}<span>No background</span></button>
-      ${artwork.images.map((image) => artworkTile(image, surface)).join("")}
+      ${artworkPool(surface).map((image) => artworkTile(image, surface)).join("")}
     </div>
+    <p class="background-note">The rooms and desks are included with the app. ${artwork.images.length ? `${artwork.images.length} of your own image${artwork.images.length === 1 ? "" : "s"} ${artwork.images.length === 1 ? "is" : "are"} added after them.` : "Add your own below and it will join the rotation."}</p>
+    <span class="menu-label">ADVANCED</span>
     <label class="menu-item small"><input id="artworkRotate" type="checkbox" ${artwork.rotate ? "checked" : ""}> Change the background every time I open the app</label>
+    <p class="background-note">Leave this off to keep the picture you picked. With it on, the app draws a different one from the list above each time it starts.</p>
     <label class="field-label" for="artworkDim">DIM THE ARTWORK · ${Math.round((artwork.dim ?? 0.62) * 100)}%</label>
     <input id="artworkDim" class="full-input" type="range" min="0" max="90" step="5" value="${Math.round((artwork.dim ?? 0.62) * 100)}">
     <p class="background-note">JPG, PNG and WebP work. Images stay on this device.</p>`;
@@ -2153,7 +2169,7 @@ function showBackgrounds(target = "reader") {
   );
   refreshIcons();
   const paint = () => {
-    const image = artwork.images.find((i) => i.id === artwork[surface]);
+    const image = artworkPool(surface).find((i) => i.id === artwork[surface]);
     const preview = $("#backgroundPreview");
     if (preview)
       preview.style.backgroundImage = image ? `url("${image.dataUrl}")` : "none";
@@ -3181,10 +3197,8 @@ $("#homeImport").onclick = () => $("#pdfFile").click();
 $("#homeBackup").onclick = run(() => showVault());
 $("#crumbHome").onclick = run(() => showHome());
 $("#homeBrand").onclick = run(() => showHome());
-on("prevSmall", () => go(page - 1, true));
-on("nextSmall", () => go(page + 1, true));
-on("first", () => go(1));
-on("last", () => go(pdf.numPages));
+// Page turns are swipes, the arrow keys, or typing a page number: there are no
+// arrow buttons beside the page any more.
 on("sound", async () => {
   muted = !muted;
   pageAudio.setMuted(muted);

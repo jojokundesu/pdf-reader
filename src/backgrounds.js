@@ -104,8 +104,8 @@ export function newArtwork({ dataUrl, width, height, name }) {
 // A surface with nothing chosen stays plain, so art picked for the library
 // does not leak into the reading room (or the other way round). Rotation only
 // applies once a surface has art, and then it walks the whole library.
-export function pickArtwork(library, surface, previousId = null) {
-  const images = library?.images || [];
+export function pickArtwork(library, surface, previousId = null, pool = null) {
+  const images = pool || library?.images || [];
   const chosen = library?.[surface];
   if (!images.length || !chosen) return null;
   if (!library.rotate) return images.find((i) => i.id === chosen) || null;
