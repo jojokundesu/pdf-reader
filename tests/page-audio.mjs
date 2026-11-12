@@ -263,6 +263,10 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
+    // Autoplay needs a real user gesture after a reload; a synthetic keydown
+    // does not count, so tap the page once before turning it with the keyboard.
+    await p.locator("#rightPage").click({ position: { x: 40, y: 40 } });
+    await p.waitForTimeout(150);
     await pressKey("ArrowLeft");
     await pageNum(7);
     await starts(1);
