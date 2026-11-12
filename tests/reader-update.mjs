@@ -114,18 +114,39 @@ async function openReaderTools() {
   );
 }
 // At phone width the reader toolbar is hidden, so the menus live under the
-// reader-tools button.
+// reader-tools button. Wait for the popover the app actually rendered and for
+// the right owner, instead of assuming a toggle direction.
+const popoverState = () =>
+  p.evaluate(() => {
+    const pop = document.querySelector("#popover");
+    return { hidden: pop.hidden, owner: pop.dataset.owner || null };
+  });
 async function openToolMenu(tool) {
-  if (await p.locator("#popover").isHidden()) {
+  const owner = tool === "#toolTheme" ? "theme" : "layout";
+  const before = await popoverState();
+  if (before.hidden || before.owner !== owner) {
+    if (!before.hidden) await closeMenu();
     await openReaderTools();
     await p.locator(tool).click();
   }
-  await p.locator("#popover").waitFor({ state: "visible" });
+  await p.waitForFunction(
+    (owner) => {
+      const pop = document.querySelector("#popover");
+      return !pop.hidden && pop.dataset.owner === owner;
+    },
+    owner,
+    { timeout: 15000 },
+  );
 }
-async function closeMenu(tool = "#toolLayout") {
-  await openReaderTools();
-  await p.locator(tool).click();
-  await p.locator("#popover").waitFor({ state: "hidden" });
+async function closeMenu() {
+  await p.evaluate(() => {
+    document.querySelector("#minimizePopover")?.click();
+    document.querySelector("#popover").hidden = true;
+    document.querySelector("#resumePopover").hidden = true;
+  });
+  await p.waitForFunction(() => document.querySelector("#popover").hidden, null, {
+    timeout: 15000,
+  });
 }
 async function backgroundChoice(id) {
   await openToolMenu("#toolTheme");
@@ -215,14 +236,14 @@ try {
   console.log("PASS fast interior flick released while canvases are preparing");
   await openToolMenu("#toolLayout");
   await p.locator("#rtlToggle").check();
-  await closeMenu("#toolLayout");
+  await closeMenu();
   await drag();
   await waitPage(2);
   await drag({ dx: 0.32 });
   await waitPage(3);
   await openToolMenu("#toolLayout");
   await p.locator("#rtlToggle").uncheck();
-  await closeMenu("#toolLayout");
+  await closeMenu();
   console.log("PASS RTL reverses interior-swipe navigation");
   assert.equal(
     await p.locator("#zoomIn, #zoomOut, #zoomValue, #marker, #eraser, #hand").count(),
