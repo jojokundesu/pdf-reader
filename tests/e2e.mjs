@@ -70,6 +70,9 @@ try {
     "a first launch lands on the library, not inside the reader",
   );
   assert.equal(await p.locator("#homeGrid .home-book").count(), 1);
+  await p
+    .locator("#homeContinueButton")
+    .waitFor({ state: "visible", timeout: 20000 });
   assert.equal(await p.locator("#homeContinueButton").isVisible(), true);
   assert.equal(await p.locator("#dialog").isVisible(), true);
   assert.match(
@@ -88,6 +91,9 @@ try {
   await p.locator("#tutorialBack").click();
   await p.locator("#tutorialNext").click();
   await p.locator("#tutorialSkip").click();
+  await p
+    .locator("#homeContinueButton")
+    .waitFor({ state: "visible", timeout: 20000 });
   await p.locator("#homeContinueButton").click();
   await p.waitForFunction(() => !document.body.classList.contains("at-home"));
   await ready();
@@ -134,6 +140,9 @@ try {
     .locator("#homeContinue .home-progress span")
     .evaluate((el) => el.style.width);
   assert.match(homeProgress, /%$/);
+  await p
+    .locator("#homeContinueButton")
+    .waitFor({ state: "visible", timeout: 20000 });
   await p.locator("#homeContinueButton").click();
   await p.waitForFunction(() => !document.body.classList.contains("at-home"));
   await ready();
@@ -1118,6 +1127,18 @@ try {
     "PASS source-based reading state fingerprint stays stable across re-import",
   );
 
+  // Leave the app on the shelf, then relaunch. (A reload straight out of the
+  // reader deliberately resumes that book, so the library has to be the last
+  // screen for this to be a launch-at-the-shelf check.)
+  if (await p.locator("#library").isVisible().catch(() => false)) {
+    await p.locator("#library").click();
+  } else {
+    if (await p.locator("#focusPanel").isHidden())
+      await p.locator("#focusTools").click();
+    await p.waitForFunction(() => !document.querySelector("#focusPanel").hidden);
+    await p.locator("#toolHome").click();
+  }
+  await p.waitForFunction(() => document.body.classList.contains("at-home"));
   await p.reload();
   await ready();
   assert.equal(
@@ -1126,6 +1147,9 @@ try {
     "a fresh launch opens the library home screen",
   );
   assert.equal(await p.locator("#homeGrid .home-book").count() > 0, true);
+  await p
+    .locator("#homeContinueButton")
+    .waitFor({ state: "visible", timeout: 20000 });
   await p.locator("#homeContinueButton").click();
   await p.waitForFunction(() => !document.body.classList.contains("at-home"));
   await ready();
@@ -1179,9 +1203,17 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
-    await p.locator("#homeContinueButton").click();
+    // An offline reload resumes the book it was reading; if the shelf shows
+    // first, the continue card opens the same book.
+    if (await p.evaluate(() => document.body.classList.contains("at-home"))) {
+      await p
+        .locator("#homeContinueButton")
+        .waitFor({ state: "visible", timeout: 20000 });
+      await p.locator("#homeContinueButton").click();
+    }
     await p.waitForFunction(
       () => document.querySelector("#bookTitle").textContent === "hindi-notes",
+      null,
       { timeout: 30000 },
     );
     assert.equal(await p.locator("#pageInput").inputValue(), "1");

@@ -28,7 +28,10 @@ async function enterReader() {
   await dismissFirstRunTutorial();
   if (await p.evaluate(() => document.body.classList.contains("at-home"))) {
     await p.locator("#homeContinueButton").waitFor({ state: "visible", timeout: 20000 });
-    await p.locator("#homeContinueButton").click();
+    await p
+    .locator("#homeContinueButton")
+    .waitFor({ state: "visible", timeout: 20000 });
+  await p.locator("#homeContinueButton").click();
     await p.waitForFunction(() => !document.body.classList.contains("at-home"));
   }
 }
