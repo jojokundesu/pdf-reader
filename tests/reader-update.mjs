@@ -39,40 +39,28 @@ const ready = () =>
       document.querySelector("#loading").hidden,
   );
 const num = () => p.locator("#pageInput").inputValue();
+// Playwright does not await async waitForFunction predicates, so wait for the
+// painted library (or the tour) and then dismiss the tour if it showed up.
 async function dismissFirstRunTutorial() {
-  await p.waitForFunction(async () => {
-    if (document.querySelector("#dialog")?.open) return true;
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-    });
-    if (!db) return false;
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-      request.onerror = () => resolve(false);
-    });
-  });
-  if (await p.locator("#tutorialSkip").isVisible())
+  await p.waitForFunction(
+    () =>
+      document.querySelector("#dialog")?.open === true ||
+      document.querySelectorAll("#homeGrid .home-book").length > 0,
+    null,
+    { timeout: 40000 },
+  );
+  for (let i = 0; i < 20; i++) {
+    if (await p.evaluate(() => document.querySelector("#dialog")?.open === true))
+      break;
+    await p.waitForTimeout(100);
+  }
+  if (await p.locator("#tutorialSkip").isVisible().catch(() => false))
     await p.locator("#tutorialSkip").click();
-  await p.waitForFunction(async () => {
-    if (document.querySelector("#dialog")?.open) return false;
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-    });
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-    });
-  });
+  await p.waitForFunction(
+    () => document.querySelector("#dialog")?.open !== true,
+    null,
+    { timeout: 20000 },
+  );
 }
 async function waitPage(n) {
   await p.waitForFunction(
@@ -92,7 +80,7 @@ async function drag({
   y = 0.5,
   dx = -0.32,
   dy = 0,
-  hold = 450,
+  hold = 120,
   cancel = false,
   quick = false,
   leaf = "#rightPage",
@@ -118,8 +106,29 @@ async function drag({
   if (!quick) await p.waitForTimeout(120);
   await touch(cancel ? "touchCancel" : "touchEnd", []);
 }
+async function openReaderTools() {
+  if (await p.locator("#focusPanel").isHidden())
+    await p.locator("#focusTools").click();
+  await p.waitForFunction(
+    () => document.querySelector("#focusPanel").hidden === false,
+  );
+}
+// At phone width the reader toolbar is hidden, so the menus live under the
+// reader-tools button.
+async function openToolMenu(tool) {
+  if (await p.locator("#popover").isHidden()) {
+    await openReaderTools();
+    await p.locator(tool).click();
+  }
+  await p.locator("#popover").waitFor({ state: "visible" });
+}
+async function closeMenu(tool = "#toolLayout") {
+  await openReaderTools();
+  await p.locator(tool).click();
+  await p.locator("#popover").waitFor({ state: "hidden" });
+}
 async function backgroundChoice(id) {
-  if (await p.locator("#popover").isHidden()) await p.locator("#theme").click();
+  await openToolMenu("#toolTheme");
   await p.locator(`button[data-background="${id}"]`).click();
   await p.waitForFunction(
     (id) => document.documentElement.dataset.background === id,
@@ -167,25 +176,28 @@ try {
   await ready();
   assert.equal(await black(), "rgb(41, 35, 30)");
   await backgroundChoice("black");
+  await openToolMenu("#toolTheme");
   await p.locator('button[data-theme="sepia"]').click();
   assert.equal(await black(), "rgb(0, 0, 0)");
-  await p.locator("#theme").click();
+  await openToolMenu("#toolTheme");
   await p.locator('button[data-theme="original"]').click();
   console.log(
     "PASS pure-black default, independent paper colors, all four backgrounds, persisted preference",
   );
-  await drag({ x: 0.75, y: 0.5, hold: 800 });
+  // A press-and-hold now starts a text selection, so page turns are plain
+  // swipes: touch down and drag before the 380 ms hold completes.
+  await drag({ x: 0.75, y: 0.5 });
   await waitPage(2);
   await drag({ x: 0.25, y: 0.4, dx: -0.24 });
   await waitPage(3);
   await drag({ x: 0.4, y: 0.6, dx: 0.32 });
   await waitPage(2);
   console.log(
-    "PASS actual touch hold-and-drag from the interior in both directions, independent of starting half",
+    "PASS touch swipes from the interior turn pages in both directions, independent of starting half",
   );
-  await drag({ dx: 0 });
+  await drag({ dx: 0, hold: 700 });
   await p.waitForTimeout(500);
-  assert.equal(await num(), "2");
+  assert.equal(await num(), "2", "a long press selects text instead of turning");
   await drag({ dx: 0, dy: 0.2 });
   await p.waitForTimeout(400);
   assert.equal(await num(), "2");
@@ -201,16 +213,16 @@ try {
   await drag({ x: 0.5, dx: -0.35, hold: 0, quick: true });
   await waitPage(3);
   console.log("PASS fast interior flick released while canvases are preparing");
-  await p.locator("#layout").click();
+  await openToolMenu("#toolLayout");
   await p.locator("#rtlToggle").check();
-  await p.locator("#layout").click();
+  await closeMenu("#toolLayout");
   await drag();
   await waitPage(2);
   await drag({ dx: 0.32 });
   await waitPage(3);
-  await p.locator("#layout").click();
+  await openToolMenu("#toolLayout");
   await p.locator("#rtlToggle").uncheck();
-  await p.locator("#layout").click();
+  await closeMenu("#toolLayout");
   console.log("PASS RTL reverses interior-swipe navigation");
   assert.equal(
     await p.locator("#zoomIn, #zoomOut, #zoomValue, #marker, #eraser, #hand").count(),

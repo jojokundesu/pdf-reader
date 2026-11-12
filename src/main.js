@@ -6,6 +6,7 @@ import "./style.css";
 import {
   createIcons,
   ArrowUpRight,
+  Ban,
   BookOpen,
   BookOpenCheck,
   BookOpenText,
@@ -36,7 +37,10 @@ import {
   MessageSquare,
   Minimize,
   Minus,
+  CloudMoon,
+  Image as ImageIcon,
   Moon,
+  MoonStar,
   MoveHorizontal,
   NotebookPen,
   PanelRightOpen,
@@ -58,6 +62,7 @@ import {
 } from "lucide";
 const icons = {
   ArrowUpRight,
+  Ban,
   BookOpen,
   BookOpenCheck,
   BookOpenText,
@@ -89,6 +94,9 @@ const icons = {
   Minimize,
   Minus,
   Moon,
+  MoonStar,
+  CloudMoon,
+  Image: ImageIcon,
   MoveHorizontal,
   NotebookPen,
   PanelRightOpen,
@@ -119,12 +127,18 @@ import {
   findTextMatches,
   rangesForTextMatches,
 } from "./text-search.js";
-import { lookupWord, phraseWords } from "./dictionary.js";
+import { lookupWord } from "./dictionary.js";
+import {
+  EMPTY_LIBRARY,
+  artworkFromCanvas,
+  newArtwork,
+  pickArtwork,
+  readArtworkFile,
+} from "./backgrounds.js";
 import {
   mergeRects,
   relativeRects,
   selectionText,
-  sentenceAt,
   wordBounds,
 } from "./text-selection.js";
 const supportedBookExtensions = new Set([
@@ -190,8 +204,9 @@ let pdf,
   highlightColor = "#FFE066",
   searchRects = new Map(),
   installEvent,
-  fullscreen = false,
-  textSelection = false;
+  fullscreen = false;
+let artwork = { ...EMPTY_LIBRARY },
+  artworkShown = { home: null, reader: null };
 let clipColor = "#b9c6ce",
   sessionStart = Date.now(),
   baseSeconds = 0,
@@ -204,13 +219,13 @@ let clipColor = "#b9c6ce",
 const app = $("#app");
 app.innerHTML = `
 <aside class="rail"><a class="brand" href="#" aria-label="FlipVault home">${icon("book-open")}</a><div class="rail-group">${btn("library", "library-big", "Your library")}${btn("reader", "book-open-text", "Reading room", "active")}${btn("clips", "paperclip", "Paperclips, notes & highlights")}${btn("search", "search", "Search this book")}</div><div class="rail-bottom">${btn("help", "circle-help", "Help & getting started")}<span class="avatar">Y</span></div></aside>
-<div class="shell"><header class="topbar hud"><button id="homeBrand" class="wordmark" aria-label="Go to my library">FlipVault <span>PRO</span></button><div class="breadcrumb"><button id="crumbHome" class="crumb-home">My library</button>${icon("chevron-right")}<strong id="bookTitle">Welcome</strong></div><div class="top-actions">${btn("searchTop", "search", "Search this book", "search-top")}<button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a book", "import-btn")}</div></header>
-<main><section id="home" class="home" aria-label="Your library"><div class="home-hero"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1><p class="home-sub">Everything you read and mark stays on this device.</p></div><button id="homeImport" class="primary home-import">${icon("plus")}<span>Add a book</span></button></div><div id="homeContinue" class="home-continue" hidden></div><div class="home-head-row"><h2 class="home-title">Your books</h2><span id="homeCount" class="home-count"></span></div><div id="homeGrid" class="home-grid"></div></section>
+<div class="shell"><header class="topbar hud"><button id="homeBrand" class="wordmark" aria-label="Go to my library">FlipVault <span>PRO</span></button><div class="breadcrumb"><button id="crumbHome" class="crumb-home">My library</button>${icon("chevron-right")}<strong id="bookTitle">Welcome</strong></div><div class="top-actions">${btn("focusSearch", "search", "Find in this book", "icon-btn top-icon")}${btn("focusTools", "sliders-horizontal", "Reader tools", "icon-btn top-icon")}${btn("exitFocus", "minimize", "Exit focus mode", "icon-btn top-icon")}<button id="vault" class="vault-pill">${icon("shield-check")}<span>Saved on device</span><b></b></button>${btn("import", "plus", "Import a book", "import-btn")}</div></header>
+<main><section id="home" class="home" aria-label="Your library"><div class="home-hero"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1><p class="home-sub">Everything you read and mark stays on this device.</p></div><div class="home-hero-actions"><button id="homeImport" class="primary home-import">${icon("plus")}<span>Add a book</span></button><button id="homeBackup" class="secondary home-backup">${icon("shield-check")}<span>Back up reading data</span></button></div></div><div id="homeContinue" class="home-continue" hidden></div><div class="home-head-row"><h2 class="home-title">Your books</h2><span id="homeCount" class="home-count"></span></div><div id="homeGrid" class="home-grid"></div></section>
 <div class="workspace-header hud"><div><div class="eyebrow">YOUR READING ROOM</div><h1>A little less noise. A little more book.</h1></div><button id="focus" class="subtle">${icon("maximize")}<span>Focus mode</span></button></div>
-<div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("selectText", "type", "Select, highlight or look up text")}${btn("addClip", "paperclip", "Attach a paperclip")}</div><div class="toolbar-group">${btn("more", "ellipsis", "More reading tools")}</div></div>
-<section id="stage" class="stage" aria-label="Interactive book reader"><div class="stage-ambient"></div><button id="prev" class="page-nav previous" title="Previous page" aria-label="Previous page">${icon("chevron-left")}</button><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><div id="leftHighlightLayer" class="text-highlight-layer" aria-hidden="true"></div><div id="leftSearchLayer" class="search-layer" aria-hidden="true"></div><div id="leftTextLayer" class="text-layer" aria-label="Selectable page text"></div><div id="leftSelectionLayer" class="selection-layer" aria-hidden="true"></div><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><div id="highlightLayer" class="text-highlight-layer"></div><div id="searchLayer" class="search-layer" aria-hidden="true"></div><div id="textLayer" class="text-layer" aria-label="Selectable page text"></div><div id="selectionLayer" class="selection-layer" aria-hidden="true"></div><div id="uiLayer" class="page-ui"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><button id="next" class="page-nav next" title="Next page" aria-label="Next page">${icon("chevron-right")}</button><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
+<div class="reader-toolbar hud"><div class="toolbar-group"><button id="layout" class="text-btn">${icon("panels-top-left")}<span>Auto spread</span>${icon("chevron-down")}</button><span class="divider"></span><button id="theme" class="text-btn">${icon("sun")}<span>Original paper</span>${icon("chevron-down")}</button></div><div class="toolbar-group"><span class="tool-label">TOOLS</span>${btn("addClip", "paperclip", "Attach a paperclip")}</div></div>
+<section id="stage" class="stage" aria-label="Interactive book reader"><div class="stage-ambient"></div><div id="bookViewport" class="book-viewport"><div id="bookSurface" class="book-surface"><div id="leftPage" class="page left-page"><canvas id="leftPdf"></canvas><div id="leftHighlightLayer" class="text-highlight-layer" aria-hidden="true"></div><div id="leftSearchLayer" class="search-layer" aria-hidden="true"></div><div id="leftTextLayer" class="text-layer" aria-label="Selectable page text"></div><div id="leftSelectionLayer" class="selection-layer" aria-hidden="true"></div><div id="leftUI" class="page-ui"></div></div><div id="rightPage" class="page right-page"><canvas id="pdfCanvas"></canvas><div id="highlightLayer" class="text-highlight-layer"></div><div id="searchLayer" class="search-layer" aria-hidden="true"></div><div id="textLayer" class="text-layer" aria-label="Selectable page text"></div><div id="selectionLayer" class="selection-layer" aria-hidden="true"></div><div id="uiLayer" class="page-ui"></div></div><div id="edgeTabs" class="edge-tabs"></div><canvas id="curlCanvas"></canvas></div></div><div id="loading" class="loading" hidden><span class="spinner"></span><span>Preparing your pages…</span></div><div class="stage-caption hud"><span>${icon("move-horizontal")} Hold & drag anywhere to turn the page</span><span id="readingTime">A little time, well spent.</span></div></section>
 <footer class="bottom-panel hud"><div class="page-controls"><div class="progress-copy"><span id="progressLabel">YOUR PROGRESS</span><strong id="progressPercent">0%</strong></div><div class="pagination">${btn("first", "chevrons-left", "First page")}${btn("prevSmall", "chevron-left", "Previous page")}<label class="page-input"><input id="pageInput" type="number" min="1" value="1" aria-label="Go to page"><span id="pageTotal">/ 12</span></label>${btn("nextSmall", "chevron-right", "Next page")}${btn("last", "chevrons-right", "Last page")}</div><div class="footer-actions">${btn("sound", "volume-2", "Toggle page sound")}${btn("filmToggle", "gallery-horizontal-end", "Toggle page thumbnails", "active")}${btn("export", "download", "Export & study summary")}</div></div><div id="filmstrip" class="filmstrip" aria-label="Page thumbnails"></div><div class="footer-note"><span>${icon("lock-keyhole")} Your books. Your notes. Only on your device.</span><span id="sessionLabel">MADE FOR SLOW READING</span></div></footer>
-</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><button id="exitFocus" class="focus-return" aria-label="Exit focus mode">Exit focus ${icon("minimize")}</button><button id="focusTools" class="focus-tools-button" aria-label="Open reader tools" aria-expanded="false">${icon("sliders-horizontal")}<span>Reader tools</span></button><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><button id="focusSearch" class="focus-search" aria-label="Search this book">${icon("search")}<span>Find</span></button><section id="readerSearch" class="reader-search" role="search" aria-label="Search this book" hidden><button id="closeSearch" class="search-close" aria-label="Close search">${icon("x")}</button><input id="searchInput" type="search" enterkeyhint="search" placeholder="Find in this document" aria-label="Find in this document" autocomplete="off"><span id="searchStatus" class="search-status" aria-live="polite">0 of 0</span><button id="previousSearchHit" aria-label="Previous match">${icon("chevron-left")}</button><button id="nextSearchHit" aria-label="Next match">${icon("chevron-right")}</button><button id="selectSearchHit" aria-label="Actions for current match" title="Select this match for copy, highlight or meaning" disabled>⋯</button></section><div id="selectionActions" class="selection-actions" role="toolbar" aria-label="Selected text actions" hidden><span id="selectionCount">Selected text</span><button id="copySelection">Copy</button><button id="highlightSelection">Highlight</button><button id="meaningSelection">Meaning</button><button id="translateSelection">Translate</button><button id="commentSelection">Comment</button><button id="moreSelection" aria-expanded="false">More</button><button id="clearSelection" aria-label="Dismiss selection actions">×</button></div><div id="selectionMenu" class="selection-menu" hidden><button id="selectAllSelection">Select all on page</button><button id="shareSelection">Share selection</button><div class="highlight-colors" role="group" aria-label="Highlight colour"></div></div><input id="pdfFile" type="file" accept=".pdf,.epub,.mobi,.azw,.azw3,.cbz,.cbr,.djvu,.djv,.txt,.html,.htm,application/pdf,application/epub+zip,text/plain,text/html" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
+</main></div><div id="drawerBackdrop" class="drawer-backdrop" hidden></div><aside id="drawer" class="drawer" hidden></aside><div id="popover" class="popover" hidden></div><section id="focusPanel" class="focus-tools-panel" aria-label="Reader tools" hidden></section><button id="resumeDialog" class="resume-popup" hidden>${icon("message-square")}<span>Resume dialog</span></button><button id="resumeDrawer" class="resume-popup resume-drawer" hidden>${icon("panel-right-open")}<span>Resume panel</span></button><button id="resumePopover" class="resume-popup resume-menu" hidden>${icon("menu")}<span>Resume menu</span></button><button id="resumeReference" class="resume-popup resume-reference" hidden>${icon("panels-left-bottom")}<span>Resume reference</span></button><div id="toast" class="toast" role="status" hidden></div><section id="readerSearch" class="reader-search" role="search" aria-label="Search this book" hidden><button id="closeSearch" class="search-close" aria-label="Close search">${icon("x")}</button><input id="searchInput" type="search" enterkeyhint="search" placeholder="Find in this document" aria-label="Find in this document" autocomplete="off"><span id="searchStatus" class="search-status" aria-live="polite">0 of 0</span><button id="previousSearchHit" aria-label="Previous match">${icon("chevron-left")}</button><button id="nextSearchHit" aria-label="Next match">${icon("chevron-right")}</button><button id="selectSearchHit" aria-label="Actions for current match" title="Select this match for copy, highlight or meaning" disabled>⋯</button></section><div id="selectionActions" class="selection-actions" role="toolbar" aria-label="Selected text actions" hidden><span id="selectionCount">Selected text</span><button id="copySelection">Copy</button><button id="highlightSelection">Highlight</button><button id="meaningSelection">Meaning</button><button id="translateSelection">Translate</button><button id="commentSelection">Comment</button><button id="moreSelection" aria-expanded="false">More</button><button id="clearSelection" aria-label="Dismiss selection actions">×</button></div><div id="selectionMenu" class="selection-menu" hidden><button id="selectAllSelection">Select all on page</button><button id="shareSelection">Share selection</button><div class="highlight-colors" role="group" aria-label="Highlight colour"></div></div><input id="pdfFile" type="file" accept=".pdf,.epub,.mobi,.azw,.azw3,.cbz,.cbr,.djvu,.djv,.txt,.html,.htm,application/pdf,application/epub+zip,text/plain,text/html" multiple hidden><input id="vaultFile" type="file" accept=".json,.flipvault,application/json" hidden><input id="artworkFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><input id="artworkPdf" type="file" accept=".pdf,application/pdf" hidden><dialog id="dialog"></dialog><div id="reference" class="reference" hidden></div>`;
 function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.65 } });
 }
@@ -291,10 +306,15 @@ async function save() {
     });
   return saveQueue;
 }
-function scheduleSave() {
+let lastScheduledPage = 0;
+function scheduleSave(delay = null) {
   clearTimeout(saveTimer);
   $("#vault span").textContent = "Saving…";
-  saveTimer = setTimeout(() => save().catch(fail), 350);
+  // A page turn is the one thing a reader expects to survive an immediate
+  // reload, so persist it almost at once; everything else can wait.
+  if (delay == null) delay = page === lastScheduledPage ? 350 : 60;
+  lastScheduledPage = page;
+  saveTimer = setTimeout(() => save().catch(fail), Math.max(0, delay));
 }
 async function importPDF(file, { open = true } = {}) {
   $("#loading").hidden = false;
@@ -376,10 +396,7 @@ async function openBook(b) {
   sessionStart = Date.now();
   rememberReader(b.pdfHash);
   const mobileReader = matchMedia("(max-width: 700px)").matches;
-  textSelection = false;
-  document.body.classList.remove("text-selection");
-  $("#selectText").classList.remove("active");
-  $("#selectText").setAttribute("aria-pressed", "false");
+  clearSelection();
   document.body.classList.remove("at-home");
   $("#bookTitle").textContent = b.title;
   if (mobileReader) {
@@ -394,8 +411,10 @@ async function openBook(b) {
   closeDrawer();
   await render();
   buildFilm();
-  await save();
+  // The book is readable the moment its pages and thumbnails exist; the
+  // state write that follows must not keep keyboard and touch input locked.
   ready = true;
+  await save();
 }
 function isSpread() {
   return (
@@ -587,21 +606,14 @@ async function renderTextLayer(n, entry, container) {
     const content = await entry.pdfPage.getTextContent({
       includeMarkedContent: true,
     });
-    if (
-      (!textSelection && !searchQuery) ||
-      activeTextLayers.get(container) !== token
-    )
-      return;
+    if (activeTextLayers.get(container) !== token) return;
     const layer = new pdfjs.TextLayer({
       textContentSource: content,
       container,
       viewport: entry.pdfPage.getViewport({ scale: cssScale }),
     });
     await layer.render();
-    if (
-      (!textSelection && !searchQuery) ||
-      activeTextLayers.get(container) !== token
-    ) {
+    if (activeTextLayers.get(container) !== token) {
       container.replaceChildren();
       return;
     }
@@ -612,37 +624,7 @@ async function renderTextLayer(n, entry, container) {
   }
 }
 
-function toggleTextSelection(enabled = !textSelection) {
-  textSelection = !!enabled;
-  document.body.classList.toggle("text-selection", textSelection);
-  $("#selectText").classList.toggle("active", textSelection);
-  $("#selectText").setAttribute("aria-pressed", String(textSelection));
-  $("#selectText").title = textSelection
-    ? "Done selecting"
-    : "Select, highlight or look up text";
-  clearSelection();
-  if (!textSelection) {
-    toast("Done selecting. Pages turn again.");
-    return Promise.resolve();
-  }
-  if (!pdf) return Promise.resolve();
-  const renders = [
-    getPageCanvas(page).then((entry) =>
-      renderTextLayer(page, entry, $("#textLayer")),
-    ),
-  ];
-  if (!$("#leftPage").hidden) {
-    const leftNumber = +$("#leftPage").dataset.page;
-    renders.push(
-      getPageCanvas(leftNumber).then((entry) =>
-        renderTextLayer(leftNumber, entry, $("#leftTextLayer")),
-      ),
-    );
-  }
-  return Promise.all(renders)
-    .then(() => paintSearchOverlay())
-    .catch(fail);
-}
+
 
 // --- selection ----------------------------------------------------------
 function caretFromPoint(x, y) {
@@ -659,23 +641,6 @@ function caretFromPoint(x, y) {
   return range;
 }
 
-function rangeBetween(anchor, focus) {
-  const range = document.createRange();
-  const backwards =
-    anchor.startContainer === focus.startContainer
-      ? focus.startOffset < anchor.startOffset
-      : // eslint-disable-next-line no-bitwise
-        !(anchor.startContainer.compareDocumentPosition(focus.startContainer) & Node.DOCUMENT_POSITION_FOLLOWING);
-  if (backwards) {
-    range.setStart(focus.startContainer, focus.startOffset);
-    range.setEnd(anchor.startContainer, anchor.startOffset);
-  } else {
-    range.setStart(anchor.startContainer, anchor.startOffset);
-    range.setEnd(focus.startContainer, focus.startOffset);
-  }
-  return range;
-}
-
 function wordRangeAt(node, offset) {
   const bounds = wordBounds(node.nodeValue, offset);
   if (!bounds) return null;
@@ -685,67 +650,13 @@ function wordRangeAt(node, offset) {
   return range;
 }
 
-function sentenceRangeAt(node, offset) {
-  const bounds = sentenceAt(node.nodeValue, offset);
-  if (!bounds) return null;
-  const range = document.createRange();
-  range.setStart(node, bounds.start);
-  range.setEnd(node, bounds.end);
-  return range;
-}
-
-function paragraphRangeAt(node, offset) {
-  const layer = layerForNode(node);
-  if (!layer) return wordRangeAt(node, offset);
-  const spans = [...layer.querySelectorAll("span")].filter(
-    (span) => span.textContent.trim() && span.firstChild,
-  );
-  const index = spans.findIndex((span) => span.contains(node));
-  if (index < 0) return wordRangeAt(node, offset);
-  const rectOf = (span) => span.getBoundingClientRect();
-  const base = rectOf(spans[index]);
-  const limit = Math.max(base.height * 1.8, 14);
-  let first = index,
-    last = index;
-  while (first > 0) {
-    const prev = rectOf(spans[first - 1]);
-    if (Math.abs(prev.top - rectOf(spans[first]).top) < limit * 0.35) first--;
-    else if (rectOf(spans[first]).top - prev.bottom <= limit) first--;
-    else break;
-  }
-  while (last < spans.length - 1) {
-    const next = rectOf(spans[last + 1]);
-    if (Math.abs(next.top - rectOf(spans[last]).top) < limit * 0.35) last++;
-    else if (next.top - rectOf(spans[last]).bottom <= limit) last++;
-    else break;
-  }
-  const range = document.createRange();
-  range.setStart(spans[first].firstChild, 0);
-  range.setEnd(
-    spans[last].lastChild,
-    spans[last].lastChild.nodeValue?.length || 0,
-  );
-  return range;
-}
-
-let lastTextTap = { at: 0, x: 0, y: 0, count: 0 };
-function tapCountFor(x, y) {
-  const now = Date.now();
-  const near =
-    Math.hypot(x - lastTextTap.x, y - lastTextTap.y) < 26 &&
-    now - lastTextTap.at < 340;
-  const count = near ? Math.min(3, lastTextTap.count + 1) : 1;
-  lastTextTap = { at: now, x, y, count };
-  return count;
-}
-
 function usefulRange(range) {
   return range && selectionText(range) ? range : null;
 }
 
 // Taps can land on the whitespace pdf.js leaves between words; in that case
-// fall back to the surrounding word, line or paragraph so a tap always
-// produces something the reader can highlight, copy or look up.
+// fall back to the surrounding line so a press always produces something the
+// reader can highlight, copy or look up.
 function nearestTextRange(node, offset) {
   const element =
     node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
@@ -753,19 +664,7 @@ function nearestTextRange(node, offset) {
   if (!span) return null;
   const line = document.createRange();
   line.selectNodeContents(span);
-  if (usefulRange(line)) return line;
-  const paragraph = paragraphRangeAt(span.firstChild || span, 0);
-  return usefulRange(paragraph);
-}
-
-function rangeAtCaret(node, offset, taps) {
-  const primary =
-    taps === 3
-      ? paragraphRangeAt(node, offset)
-      : taps === 2
-        ? sentenceRangeAt(node, offset)
-        : wordRangeAt(node, offset);
-  return usefulRange(primary) || nearestTextRange(node, offset);
+  return usefulRange(line);
 }
 
 function textRangeOfSpan(span) {
@@ -775,9 +674,9 @@ function textRangeOfSpan(span) {
   return usefulRange(range);
 }
 
-// Gemtext-style layers sometimes put a single space or line-break in its own
-// span, and a tap can land exactly on it. Rather than losing the tap, grab the
-// nearest span that actually carries words.
+// Some text layers put a single space or line-break in its own span, and a
+// press can land exactly on it. Rather than losing the press, grab the nearest
+// span that actually carries words.
 function nearbyTextRange(layer, x, y) {
   if (!layer) return null;
   const hit = document.elementFromPoint?.(x, y)?.closest?.("span");
@@ -809,39 +708,35 @@ function nearbyTextRange(layer, x, y) {
   return best;
 }
 
-function rangeAtPoint(layer, x, y, taps) {
-  const caret = caretFromPoint(x, y);
-  if (caret && layer?.contains(caret.startContainer)) {
-    const range = rangeAtCaret(
-      caret.startContainer,
-      caret.startOffset,
-      taps,
-    );
-    if (range) return range;
-  }
-  return nearbyTextRange(layer, x, y);
-}
-
-function selectAtPoint(x, y, taps = 1) {
-  const range = rangeAtPoint($("#textLayer"), x, y, taps);
-  if (!range) return false;
-  selectionRange = range;
-  paintSelection();
-  updateSelectionActions();
-  return true;
-}
-
-async function startTextSelectionModeAt(x, y) {
-  if (!textSelection) await toggleTextSelection(true);
-  if (!selectAtPoint(x, y, 1))
-    toast("There is no selectable text at that point in this document.");
-}
-
 // A selection may start on a text node (word/sentence) or on the layer
 // element itself (select-all), so resolve the owning text layer either way.
 function layerForNode(node) {
   const element = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
   return element?.closest?.(".text-layer") || null;
+}
+
+// The single word under a point, falling back to the surrounding line when
+// the point sits in the gap between words.
+function wordRangeAtPoint(x, y) {
+  const caret = caretFromPoint(x, y);
+  if (caret) {
+    const range = usefulRange(
+      wordRangeAt(caret.startContainer, caret.startOffset),
+    );
+    if (range) return range;
+    const layer = layerForNode(caret.startContainer);
+    const near = nearbyTextRange(layer, x, y);
+    if (near) return near;
+  }
+  for (const layer of [$("#rightPage"), $("#leftPage")]) {
+    const textLayer = layer?.querySelector(".text-layer");
+    if (!textLayer) continue;
+    const box = textLayer.getBoundingClientRect();
+    if (x < box.left || x > box.right || y < box.top || y > box.bottom) continue;
+    const near = nearbyTextRange(textLayer, x, y);
+    if (near) return near;
+  }
+  return null;
 }
 
 function paintSelection() {
@@ -864,6 +759,7 @@ function selectionLayerFor(range) {
 
 function clearSelection() {
   selectionRange = null;
+  selecting = null;
   selectionSnapshot = { text: "", page: 0, rect: null };
   if ($("#selectionActions")) {
     $("#selectionActions").hidden = true;
@@ -878,11 +774,11 @@ function selectedPageText() {
   return selectionText(selectionRange);
 }
 
-function updateSelectionActions() {
+function updateSelectionActions(reposition = true) {
   const text = selectedPageText();
   const actions = $("#selectionActions"),
     menu = $("#selectionMenu");
-  if (!textSelection || !text || !selectionRange) {
+  if (!text || !selectionRange) {
     actions.hidden = true;
     menu.hidden = true;
     return;
@@ -906,9 +802,15 @@ function updateSelectionActions() {
       ? { left: box.left, top: box.top, width: box.width, height: box.height }
       : null,
   };
-  $("#selectionCount").textContent = `${text.length.toLocaleString()} selected`;
+  const words = text.split(/\s+/).filter(Boolean).length;
+  $("#selectionCount").textContent = `${words}w · ${text.length}c`;
+  $("#selectionCount").setAttribute(
+    "aria-label",
+    `${words} word${words === 1 ? "" : "s"} selected`,
+  );
   $("#selectionCount").title = text;
   actions.hidden = false;
+  if (!reposition) return;
   // Measure after the bar is visible so it can be clamped to the screen.
   const width = actions.offsetWidth || 280,
     height = actions.offsetHeight || 44;
@@ -923,67 +825,78 @@ function updateSelectionActions() {
   }
 }
 
-function bindTextLayerEvents(layer) {
-  layer.addEventListener("pointerdown", (event) => {
-    if (!textSelection || !pdf || turning) return;
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    const caret = caretFromPoint(event.clientX, event.clientY);
-    if (!caret || !layer.contains(caret.startContainer)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    layer.setPointerCapture(event.pointerId);
-    const taps = tapCountFor(event.clientX, event.clientY);
-    selecting = {
-      pointerId: event.pointerId,
-      layer,
-      anchor: caret,
-      taps,
-      moved: false,
-    };
-    selectionRange = null;
-    paintSelection();
-    $("#selectionActions").hidden = true;
-    $("#selectionMenu").hidden = true;
-  });
-  layer.addEventListener("pointermove", (event) => {
-    if (!selecting || selecting.pointerId !== event.pointerId) return;
-    const caret = caretFromPoint(event.clientX, event.clientY);
-    if (!caret || !selecting.layer.contains(caret.startContainer)) return;
-    event.preventDefault();
-    const range = rangeBetween(selecting.anchor, caret);
-    if (!range || !selectionText(range)) return;
-    selecting.moved = true;
-    selectionRange = range;
-    paintSelection();
-    updateSelectionActions();
-  });
-  const finish = (event) => {
-    if (!selecting || selecting.pointerId !== event.pointerId) return;
-    const state = selecting;
-    selecting = null;
-    if (state.layer.hasPointerCapture?.(event.pointerId))
-      state.layer.releasePointerCapture(event.pointerId);
-    if (!state.moved) {
-      const node = state.anchor.startContainer,
-        offset = state.anchor.startOffset;
-      selectionRange =
-        usefulRange(rangeAtCaret(node, offset, state.taps)) ||
-        nearbyTextRange(state.layer, event.clientX, event.clientY);
-      paintSelection();
-      updateSelectionActions();
-    }
-  };
-  layer.addEventListener("pointerup", finish);
-  layer.addEventListener("pointercancel", (event) => {
-    if (!selecting) return;
-    selecting = null;
-    clearSelection();
-  });
-  layer.addEventListener("contextmenu", (event) => event.preventDefault());
+// --- press-and-drag selection -------------------------------------------
+// One gesture, the one every other PDF reader uses: press and hold on a
+// word to select it, then keep dragging to extend the selection word by
+// word. There is no separate "select mode", and no tap counting.
+const HOLD_MS = 380;
+let hold = null;
+
+function clearHold() {
+  if (hold?.timer) clearTimeout(hold.timer);
+  hold = null;
 }
 
-for (const layer of [$("#textLayer"), $("#leftTextLayer")]) {
-  if (layer) bindTextLayerEvents(layer);
+function beginSelectionAt(x, y, pointerId) {
+  const range = wordRangeAtPoint(x, y);
+  const layer = layerForNode(range?.startContainer);
+  if (!range || !layer) return false;
+  gesture = null;
+  clearTimeout(holdTimer);
+  if (curl.running) curl.cancel();
+  selecting = {
+    pointerId,
+    layer,
+    anchor: {
+      node: range.startContainer,
+      offset: range.startOffset,
+      range: range.cloneRange(),
+    },
+  };
+  selectionRange = range;
+  paintSelection();
+  updateSelectionActions();
+  navigator.vibrate?.(12);
+  return true;
+}
+
+// Grow or shrink the highlight from the word the press started on to the
+// word currently under the finger, so the selection always follows the drag.
+function extendSelectionTo(x, y) {
+  if (!selecting) return;
+  const caret = caretFromPoint(x, y);
+  if (!caret) return;
+  const layer = layerForNode(caret.startContainer);
+  if (!layer || layer !== selecting.layer) return;
+  const word = wordRangeAt(caret.startContainer, caret.startOffset);
+  if (!word) return;
+  const anchor = selecting.anchor.range;
+  const range = document.createRange();
+  const startsBefore =
+    word.compareBoundaryPoints(Range.START_TO_START, anchor) < 0;
+  const endsAfter = word.compareBoundaryPoints(Range.END_TO_END, anchor) > 0;
+  if (startsBefore) {
+    range.setStart(word.startContainer, word.startOffset);
+    range.setEnd(anchor.endContainer, anchor.endOffset);
+  } else if (endsAfter) {
+    range.setStart(anchor.startContainer, anchor.startOffset);
+    range.setEnd(word.endContainer, word.endOffset);
+  } else {
+    range.setStart(anchor.startContainer, anchor.startOffset);
+    range.setEnd(anchor.endContainer, anchor.endOffset);
+  }
+  if (!selectionText(range)) return;
+  selectionRange = range;
+  paintSelection();
+  updateSelectionActions(false);
+}
+
+function finishSelection() {
+  if (!selecting) return false;
+  selecting = null;
+  clearHold();
+  updateSelectionActions();
+  return true;
 }
 
 function selectAllVisiblePageText() {
@@ -1157,38 +1070,29 @@ function renderMeaningEntry(entry) {
     .join("")}</article>`;
 }
 
+// The dictionary answers for one word at a time: the word the press started
+// on, even when the reader has dragged the selection further.
 async function showMeaning(selection) {
   const text = String(selection ?? "").trim();
-  if (!text) return;
-  closeSelectionMenus();
-  const words = phraseWords(text, 6);
-  const total = phraseWords(text, 60).length;
-  if (!words.length) {
+  const word = (text.match(/[\p{L}\p{M}][\p{L}\p{M}_’'-]*/u) || [])[0];
+  if (!word) {
     toast("Select an English word to look up.");
     return;
   }
+  closeSelectionMenus();
   const d = dialog(
-    words.length === 1 ? "Meaning" : "Meanings",
-    `<p class="muted">Searching the offline dictionary…</p>`,
+    "Meaning",
+    `<p class="selected-quote">“${esc(word)}”</p><p class="muted">Searching the offline dictionary…</p>`,
     `<button id="closeMeaning" class="secondary">Keep reading</button>`,
   );
   $("#closeMeaning").onclick = () => d.close();
   try {
     const { loadDictionaryChunk } = await import("./dictionary-data.js");
-    const results = [];
-    for (const word of words)
-      results.push({ word, entry: await lookupWord(word, loadDictionaryChunk) });
+    const entry = await lookupWord(word, loadDictionaryChunk);
     if (!d.open) return;
-    const found = results.filter((result) => result.entry);
-    d.querySelector(".dialog-body").innerHTML = found.length
-      ? `<div class="meaning-panel">${found
-          .map((result) => renderMeaningEntry(result.entry))
-          .join("")}</div>${
-          total > words.length
-            ? `<p class="muted">Showing ${words.length} of ${total} words in your selection.</p>`
-            : ""
-        }<p class="fine-print">Offline WordNet dictionary · English headwords and common inflections.</p>`
-      : `<p class="selected-quote">“${esc(text.slice(0, 200))}”</p><p class="muted">No offline entry for “${esc(words[0])}”. The dictionary is English-only and skips proper nouns and invented words.</p>`;
+    d.querySelector(".dialog-body").innerHTML = entry
+      ? `<div class="meaning-panel">${renderMeaningEntry(entry)}</div><p class="fine-print">Offline WordNet dictionary · English headwords and common inflections.</p>`
+      : `<p class="selected-quote">“${esc(word)}”</p><p class="muted">No offline entry for “${esc(word)}”. The dictionary is English-only and skips proper nouns and invented words.</p>`;
     refreshIcons();
   } catch (error) {
     if (d.open)
@@ -1350,9 +1254,7 @@ async function paintPages(token) {
   c.height = entry.canvas.height;
   c.getContext("2d").drawImage(entry.canvas, 0, 0);
   $("#rightPage").dataset.page = page;
-  if (textSelection || searchQuery)
-    await renderTextLayer(page, entry, $("#textLayer"));
-  else $("#textLayer").replaceChildren();
+  await renderTextLayer(page, entry, $("#textLayer"));
   $("#leftPage").hidden = !spread;
   if (spread) {
     const leftNum = page > 1 ? page - 1 : Math.min(2, pdf.numPages);
@@ -1363,9 +1265,7 @@ async function paintPages(token) {
     lc.height = left.canvas.height;
     lc.getContext("2d").drawImage(left.canvas, 0, 0);
     renderPageClips($("#leftUI"), leftNum);
-    if (textSelection || searchQuery)
-      await renderTextLayer(leftNum, left, $("#leftTextLayer"));
-    else $("#leftTextLayer").replaceChildren();
+    await renderTextLayer(leftNum, left, $("#leftTextLayer"));
     $("#leftPage").dataset.page = leftNum;
   }
   renderPageClips($("#uiLayer"), page);
@@ -1382,8 +1282,7 @@ async function paintPages(token) {
   $$(".thumb").forEach((el) =>
     el.classList.toggle("selected", +el.dataset.page === page),
   );
-  $("#prev").disabled = page === 1;
-  $("#next").disabled = page === pdf.numPages;
+  centerFilmOnPage();
   cache.forEach((v, n) => {
     if (Math.abs(n - page) > 2) {
       v.canvas.width = 1;
@@ -1397,9 +1296,15 @@ async function paintPages(token) {
   updateReadingStats();
   if ($("#reference").hidden === false) showReference(referencePage);
 }
+let pendingNav = null;
 async function go(n, animate = false, playSound = true) {
   n = Math.max(1, Math.min(pdf.numPages, Math.round(n)));
-  if (n === page || turning || !Number.isFinite(n)) return;
+  if (!Number.isFinite(n)) return;
+  if (turning) {
+    pendingNav = n;
+    return;
+  }
+  if (n === page) return;
   clearSelection();
   if (
     animate &&
@@ -1414,11 +1319,7 @@ async function go(n, animate = false, playSound = true) {
   page = n;
   await render();
   if (playSound && pdf === activePdf && page === n) pageAudio.play();
-  $("#filmstrip .selected")?.scrollIntoView({
-    block: "nearest",
-    inline: "center",
-    behavior: "smooth",
-  });
+  centerFilmOnPage("smooth");
 }
 async function turn(dir) {
   if (turning || page + dir < 1 || page + dir > pdf.numPages) return;
@@ -1434,12 +1335,25 @@ async function turn(dir) {
     };
     curl.draw();
     pageAudio.play();
-    curl.release(true, () => {
+    let landed = false;
+    let watchdog = null;
+    const land = () => {
+      if (landed) return;
+      landed = true;
+      clearTimeout(watchdog);
       page += dir;
       render()
         .catch(fail)
-        .finally(() => (turning = false));
-    });
+        .finally(() => {
+          turning = false;
+          const nextNav = pendingNav;
+          pendingNav = null;
+          if (nextNav && nextNav !== page) go(nextNav, true);
+        });
+    };
+    // A dropped animation frame must never leave the reader stuck mid-turn.
+    watchdog = setTimeout(land, 1600);
+    curl.release(true, land);
   } catch (e) {
     turning = false;
     throw e;
@@ -1514,6 +1428,18 @@ async function thumbnail(n) {
   return url;
 }
 let filmObserver;
+// The thumbnail strip follows the page you are on: whenever the page changes
+// the matching thumbnail is scrolled to the middle of the strip.
+function centerFilmOnPage(behavior = "auto") {
+  const strip = $("#filmstrip");
+  if (!strip || strip.hidden) return;
+  const thumb = strip.querySelector(".thumb.selected");
+  if (!thumb) return;
+  const target =
+    thumb.offsetLeft + thumb.offsetWidth / 2 - strip.clientWidth / 2;
+  if (Math.abs(strip.scrollLeft - target) < 2) return;
+  strip.scrollTo({ left: Math.max(0, target), behavior });
+}
 function buildFilm() {
   filmObserver?.disconnect();
   $("#filmstrip").innerHTML = Array.from(
@@ -1541,10 +1467,7 @@ function buildFilm() {
     el.onclick = () => go(+el.dataset.page);
   });
   updateFilmMarkers();
-  $("#filmstrip .selected")?.scrollIntoView({
-    block: "nearest",
-    inline: "center",
-  });
+  centerFilmOnPage();
 }
 function updateFilmMarkers() {
   $$(".thumb").forEach((el) => {
@@ -1831,10 +1754,8 @@ async function showHome() {
   if (state) await save();
   rememberReader(null);
   document.body.classList.add("at-home");
-  document.body.classList.remove("focus-mode", "focus-filmstrip", "text-selection");
-  textSelection = false;
-  $("#selectText").classList.remove("active");
-  $("#selectText").setAttribute("aria-pressed", "false");
+  document.body.classList.remove("focus-mode", "focus-filmstrip");
+  clearSelection();
   $("#focusPanel").hidden = true;
   $("#focusTools").setAttribute("aria-expanded", "false");
   $("#reference").hidden = true;
@@ -1929,12 +1850,6 @@ function closeSearch() {
   $("#nextSearchHit").disabled = true;
   $("#selectSearchHit").disabled = true;
   clearSearchHighlights();
-  if (!textSelection) {
-    for (const layer of [$("#textLayer"), $("#leftTextLayer")]) {
-      activeTextLayers.set(layer, (activeTextLayers.get(layer) || 0) + 1);
-      layer.replaceChildren();
-    }
-  }
 }
 async function pageText(n) {
   if (!textCache.has(n)) {
@@ -1986,7 +1901,6 @@ async function selectSearchHit() {
   const occurrenceOnPage = searchHits
     .slice(0, index)
     .filter((match) => match.page === hit.page).length;
-  await toggleTextSelection(true);
   const ranges = rangesForTextMatches($("#textLayer"), query);
   const match = ranges[occurrenceOnPage] || ranges[0];
   closeSearch();
@@ -2054,7 +1968,6 @@ $("#searchInput").onkeydown = (event) => {
     closeSearch();
   }
 };
-$("#searchTop").onclick = showSearch;
 $("#focusSearch").onclick = showSearch;
 $("#closeSearch").onclick = closeSearch;
 $("#previousSearchHit").onclick = () =>
@@ -2098,31 +2011,38 @@ function applyBackground() {
   document.querySelector('meta[name="theme-color"]').content =
     colors[background];
 }
+// Every theme only filters the rendered page; the PDF file never changes.
+const THEMES = [
+  ["original", "sun", "Original paper", "The printed page, untouched."],
+  ["sepia", "coffee", "Warm parchment", "Dimmed warm paper for long evenings."],
+  ["cream", "moon-star", "Dark cream", "Dark, warm and soft — easy at night."],
+  ["mocha", "moon", "Mocha", "Deep brown with light text."],
+  ["slate", "cloud-moon", "Slate night", "Cool, low-glare charcoal."],
+  ["dark", "moon", "AMOLED dark", "Pure black for OLED screens."],
+  ["ink", "contrast", "E-ink contrast", "Grey, high contrast."],
+];
+function themeLabel() {
+  return THEMES.find(([id]) => id === theme)?.[2] || "Original paper";
+}
 function applyTheme() {
   document.documentElement.dataset.theme = theme;
-  $("#theme span").textContent = {
-    original: "Original paper",
-    sepia: "Warm parchment",
-    dark: "AMOLED dark",
-    ink: "E-ink contrast",
-  }[theme];
+  const label = $("#theme span");
+  if (label) label.textContent = themeLabel();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && ["cream", "mocha", "slate", "dark"].includes(theme)) {
+    const tint = { cream: "#14100c", mocha: "#100d09", slate: "#0b0f12", dark: "#060b09" };
+    meta.content = tint[theme];
+  } else if (meta) applyBackground();
 }
 function showThemes() {
   popover(
     $("#theme"),
-    `<span class="menu-label">MAKE YOURSELF COMFORTABLE</span>${[
-      ["original", "sun", "Original paper"],
-      ["sepia", "coffee", "Warm parchment"],
-      ["dark", "moon", "AMOLED dark"],
-      ["ink", "contrast", "E-ink contrast"],
-    ]
-      .map(
-        ([id, i, label]) =>
-          `<button data-theme="${id}" class="menu-item">${icon(i)}${label}${theme === id ? icon("check") : ""}</button>`,
-      )
-      .join(
-        "",
-      )}<hr><span class="menu-label">READER BACKGROUND · PAPER STAYS UNCHANGED</span><div class="background-options">${[
+    `<span class="menu-label">MAKE YOURSELF COMFORTABLE</span>${THEMES.map(
+      ([id, i, label, hint]) =>
+        `<button data-theme="${id}" class="menu-item"><span class="menu-copy">${icon(i)}<span><strong>${label}</strong><small>${hint}</small></span></span>${theme === id ? icon("check") : ""}</button>`,
+    ).join(
+      "",
+    )}<hr><span class="menu-label">SURROUNDINGS · THE PAGE KEEPS ITS OWN COLOUR</span><div class="background-options">${[
       ["black", "Pure black", "#000000"],
       ["charcoal", "Charcoal", "#141414"],
       ["forest", "Forest", "#172827"],
@@ -2134,7 +2054,7 @@ function showThemes() {
       )
       .join(
         "",
-      )}</div><label class="menu-item small"><input id="preserveImages" type="checkbox" ${document.body.classList.contains("preserve-images") ? "checked" : ""}> Preserve images in dark mode</label>`,
+      )}</div><button id="openBackgrounds" class="menu-item">${icon("image")}Background images…</button><label class="menu-item small"><input id="preserveImages" type="checkbox" ${document.body.classList.contains("preserve-images") ? "checked" : ""}> Preserve images in dark mode</label>`,
   );
   $$("[data-theme]")
     .filter((el) => el.tagName === "BUTTON")
@@ -2156,6 +2076,10 @@ function showThemes() {
         showThemes();
       })),
   );
+  $("#openBackgrounds").onclick = () => {
+    $("#popover").hidden = true;
+    showBackgrounds();
+  };
   $("#preserveImages").onchange = run(async (e) => {
     document.body.classList.toggle("preserve-images", e.target.checked);
     await store.put("settings", e.target.checked, "preserveImages");
@@ -2165,6 +2089,220 @@ function showThemes() {
       );
   });
 }
+// --- reader artwork -----------------------------------------------------
+function applyArtwork() {
+  const root = document.documentElement;
+  for (const surface of ["home", "reader"]) {
+    const image = pickArtwork(artwork, surface, artworkShown[surface]);
+    artworkShown[surface] = image?.id || null;
+    root.style.setProperty(
+      `--${surface}-art`,
+      image ? `url("${image.dataUrl}")` : "none",
+    );
+    root.dataset[surface === "home" ? "homeArt" : "readerArt"] =
+      image ? "on" : "off";
+  }
+  root.style.setProperty("--art-dim", String(artwork.dim ?? 0.62));
+}
+
+// A new rotation is drawn once per launch and whenever the app comes back to
+// the foreground, so "change every time I open the app" means exactly that.
+function rotateArtwork() {
+  if (!artwork.rotate || artwork.images.length < 2) return;
+  artworkShown = { home: artworkShown.home, reader: artworkShown.reader };
+  applyArtwork();
+}
+
+async function saveArtwork() {
+  await store.put("settings", artwork, "backgroundLibrary");
+  applyArtwork();
+}
+
+function artworkTile(image, surface) {
+  const active = artwork[surface] === image.id;
+  return `<button class="background-tile" data-artwork="${image.id}" aria-pressed="${active}" title="${esc(image.name)}"><img alt="" src="${image.dataUrl}" loading="lazy"><span>${esc(image.name)}</span></button>`;
+}
+
+function showBackgrounds(target = "reader") {
+  const surface = target === "home" ? "home" : "reader";
+  const body = `
+    <p class="muted">Pick artwork for the library, the reading room, or both. Images are cropped to fill the screen and dimmed so text stays readable; anything under 800 × 800 px is refused because it would look blurred.</p>
+    <div class="focus-tools-row" role="group" aria-label="Where this background is used">
+      <button class="chip" id="artworkForHome" aria-pressed="${surface === "home"}">${icon("library-big")}Library</button>
+      <button class="chip" id="artworkForReader" aria-pressed="${surface === "reader"}">${icon("book-open")}Reading room</button>
+    </div>
+    <p class="background-note">Each place keeps its own choice.</p>
+    <div class="background-preview" id="backgroundPreview"></div>
+    <div class="background-actions">
+      <button id="addArtwork" class="primary">${icon("image")}Add an image</button>
+      <button id="addArtworkPdf" class="secondary">${icon("file")}From a PDF page</button>
+      ${artwork.images.length ? `<button id="clearArtwork" class="secondary">${icon("trash-2")}Remove all</button>` : ""}
+    </div>
+    <div class="background-grid" id="backgroundGrid">
+      <button class="background-tile background-none" data-artwork="" aria-pressed="${!artwork[surface]}">${icon("ban")}<span>No background</span></button>
+      ${artwork.images.map((image) => artworkTile(image, surface)).join("")}
+    </div>
+    <label class="menu-item small"><input id="artworkRotate" type="checkbox" ${artwork.rotate ? "checked" : ""}> Change the background every time I open the app</label>
+    <label class="field-label" for="artworkDim">DIM THE ARTWORK · ${Math.round((artwork.dim ?? 0.62) * 100)}%</label>
+    <input id="artworkDim" class="full-input" type="range" min="0" max="90" step="5" value="${Math.round((artwork.dim ?? 0.62) * 100)}">
+    <p class="background-note">JPG, PNG and WebP work. Images stay on this device.</p>`;
+  const d = dialog(
+    "Backgrounds",
+    body,
+    `<button id="closeBackgrounds" class="secondary">Done</button>`,
+  );
+  refreshIcons();
+  const paint = () => {
+    const image = artwork.images.find((i) => i.id === artwork[surface]);
+    const preview = $("#backgroundPreview");
+    if (preview)
+      preview.style.backgroundImage = image ? `url("${image.dataUrl}")` : "none";
+    $$("#backgroundGrid [data-artwork]").forEach((tile) =>
+      tile.setAttribute(
+        "aria-pressed",
+        String((tile.dataset.artwork || null) === (artwork[surface] || null)),
+      ),
+    );
+  };
+  paint();
+  $("#closeBackgrounds").onclick = () => d.close();
+  $("#artworkForHome").onclick = () => {
+    d.close();
+    showBackgrounds("home");
+  };
+  $("#artworkForReader").onclick = () => {
+    d.close();
+    showBackgrounds("reader");
+  };
+  $$("#backgroundGrid [data-artwork]").forEach(
+    (tile) =>
+      (tile.onclick = run(async () => {
+        artwork[surface] = tile.dataset.artwork || null;
+        await saveArtwork();
+        paint();
+        toast(
+          tile.dataset.artwork
+            ? "Background updated."
+            : "Background removed.",
+        );
+      })),
+  );
+  $("#addArtwork").onclick = () => {
+    pendingArtworkSurface = surface;
+    $("#artworkFile").click();
+  };
+  $("#addArtworkPdf").onclick = () => {
+    pendingArtworkSurface = surface;
+    $("#artworkPdf").click();
+  };
+  const clear = $("#clearArtwork");
+  if (clear)
+    clear.onclick = run(async () => {
+      artwork = { ...EMPTY_LIBRARY, dim: artwork.dim };
+      await saveArtwork();
+      d.close();
+      toast("All backgrounds removed.");
+    });
+  $("#artworkRotate").onchange = run(async (event) => {
+    artwork.rotate = event.target.checked;
+    await saveArtwork();
+    toast(
+      artwork.rotate
+        ? "A different background will greet you each time."
+        : "Your background will stay put.",
+    );
+  });
+  $("#artworkDim").oninput = (event) => {
+    artwork.dim = Number(event.target.value) / 100;
+    document.documentElement.style.setProperty("--art-dim", String(artwork.dim));
+    event.target
+      .closest(".dialog-body")
+      .querySelector("label[for=artworkDim]")?.replaceChildren(
+        document.createTextNode(
+          `DIM THE ARTWORK · ${Math.round(artwork.dim * 100)}%`,
+        ),
+      );
+  };
+  $("#artworkDim").onchange = run(() => saveArtwork());
+}
+
+let pendingArtworkSurface = "reader";
+
+async function addArtworkFromFile(file) {
+  const surface = pendingArtworkSurface;
+  let prepared;
+  try {
+    prepared = await readArtworkFile(file);
+  } catch (error) {
+    // A file that fails the size rules is a normal answer, not a crash.
+    toast(error.message);
+    return;
+  }
+  const image = newArtwork({
+    ...prepared,
+    name: (file.name || "Background").replace(/\.[^.]+$/, ""),
+  });
+  artwork.images = [...artwork.images, image];
+  artwork[surface] = image.id;
+  await saveArtwork();
+  toast(`${image.name} is now your ${surface === "home" ? "library" : "reading room"} background.`);
+  showBackgrounds(surface);
+}
+
+async function addArtworkFromPdf(file) {
+  const surface = pendingArtworkSurface;
+  const label = surface === "home" ? "library" : "reading room";
+  const d = dialog(
+    "Artwork from a PDF",
+    `<p class="muted">The chosen page is rendered once and kept as a picture on this device. The PDF itself is not stored.</p><label class="field-label" for="artworkPage">PAGE NUMBER</label><input id="artworkPage" class="full-input" type="number" min="1" value="1">`,
+    `<button id="cancelArtworkPage" class="secondary">Cancel</button><button id="confirmArtworkPage" class="primary">Use this page</button>`,
+  );
+  $("#cancelArtworkPage").onclick = () => d.close();
+  $("#confirmArtworkPage").onclick = run(async () => {
+    const requested = Math.max(1, Number($("#artworkPage").value) || 1);
+    const data = await file.arrayBuffer();
+    const doc = await pdfjs.getDocument({ data }).promise;
+    try {
+      const number = Math.min(requested, doc.numPages);
+      const source = await doc.getPage(number);
+      const base = source.getViewport({ scale: 1 });
+      const scale = Math.min(3, 1800 / Math.max(base.width, base.height));
+      const viewport = source.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      await source.render({
+        canvasContext: canvas.getContext("2d"),
+        viewport,
+      }).promise;
+      const prepared = artworkFromCanvas(canvas, file.name);
+      const image = newArtwork({
+        ...prepared,
+        name: `${(file.name || "PDF").replace(/\.[^.]+$/, "")} · page ${number}`,
+      });
+      artwork.images = [...artwork.images, image];
+      artwork[surface] = image.id;
+      await saveArtwork();
+      d.close();
+      toast(`Page ${number} is now your ${label} background.`);
+      showBackgrounds(surface);
+    } finally {
+      doc.destroy?.();
+    }
+  });
+}
+
+$("#artworkFile").onchange = run(async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (file) await addArtworkFromFile(file);
+});
+$("#artworkPdf").onchange = run(async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (file) await addArtworkFromPdf(file);
+});
+
 function showLayout() {
   popover(
     $("#layout"),
@@ -2530,64 +2668,98 @@ function updateReadingStats() {
     toast("A lovely little reading session. Time to rest your eyes.");
   }
 }
-function readerOptionsHtml() {
+function readerToolsBody() {
+  const filmOn = !$("#filmstrip").hidden;
+  const focusOn = document.body.classList.contains("focus-mode");
   const fullscreenAvailable = !!document.fullscreenEnabled;
-  return `<span class="menu-label">READING OPTIONS</span><button id="referenceTool" class="menu-item">${icon("panels-left-bottom")}Reference split view</button><button id="focusTimer" class="menu-item">${icon("timer")}${focusEnd ? "Stop focus timer" : "20-minute reading ritual"}</button>${fullscreenAvailable ? `<button id="fullscreenTool" class="menu-item">${icon("expand")}Fullscreen</button>` : ""}<button id="homeTool" class="menu-item">${icon("library-big")}Back to my library</button><button id="guideTool" class="menu-item">${icon("circle-help")}Getting started</button><button id="tutorialTool" class="menu-item">${icon("book-open-check")}Replay the guided tour</button>`;
+  return `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Close reader tools">${icon("x")}</button></div>
+    <span class="menu-label">APPEARANCE</span>
+    <div class="focus-tools-row"><button id="toolLayout" class="chip">${icon("panels-top-left")}${mode === "auto" ? "Auto spread" : mode === "spread" ? "Book spread" : "Single page"}</button><button id="toolTheme" class="chip">${icon("sun")}${themeLabel()}</button><button id="toolBackground" class="chip">${icon("image")}Background</button></div>
+    <span class="menu-label">PAGES</span>
+    <div class="focus-tools-grid"><button id="toolFilmstrip" aria-pressed="${filmOn}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button id="toolGoToPage">${icon("book-open")}<span>Go to page</span></button><button id="toolBookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="toolReference">${icon("panels-left-bottom")}<span>Reference view</span></button><button id="toolSound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button id="toolTimer">${icon("timer")}<span>${focusEnd ? "Stop timer" : "20-min ritual"}</span></button>${fullscreenAvailable ? `<button id="toolFullscreen">${icon("expand")}<span>Fullscreen</span></button>` : ""}<button id="toolGuide">${icon("circle-help")}<span>Reader guide</span></button><button id="toolTour">${icon("book-open-check")}<span>Guided tour</span></button><button id="toolHome">${icon("library-big")}<span>My library</span></button></div>
+    <p class="fine-print">Select text by pressing and holding a word, then keep dragging to extend the selection.</p>`;
 }
 
-function bindReaderOptions(close) {
-  $("#referenceTool").onclick = () => {
-    close();
-    showReference(page);
+function openReaderTools() {
+  const panel = $("#focusPanel"),
+    button = $("#focusTools");
+  // The tools panel and the selection bar would fight for the same corner.
+  clearSelection();
+  closeSelectionMenus();
+  panel.innerHTML = readerToolsBody();
+  const box = button.getBoundingClientRect();
+  panel.style.top = `${Math.round(box.bottom + 8)}px`;
+  panel.style.right = `${Math.max(8, Math.round(innerWidth - box.right))}px`;
+  panel.hidden = false;
+  button.setAttribute("aria-expanded", "true");
+  refreshIcons();
+
+  const close = () => {
+    panel.hidden = true;
+    button.setAttribute("aria-expanded", "false");
   };
-  $("#focusTimer").onclick = () => {
+  const act = (id, fn) => {
+    const el = $("#" + id);
+    if (el) el.onclick = () => {
+      close();
+      fn();
+    };
+  };
+  $("#minimizeFocusTools").onclick = close;
+  act("toolLayout", () => setTimeout(() => toggleMenu("layout", showLayout)));
+  act("toolTheme", () => setTimeout(() => toggleMenu("theme", showThemes)));
+  act("toolBackground", () => showBackgrounds());
+  act("toolReference", () => showReference(page));
+  act("toolTimer", () => {
     focusEnd = focusEnd ? 0 : Date.now() + 20 * 60000;
     updateReadingStats();
-    close();
-    toast(
-      focusEnd
-        ? "Twenty minutes, just you and your book."
-        : "Reading timer stopped.",
-    );
-  };
-  const fullscreenButton = $("#fullscreenTool");
-  if (fullscreenButton)
-    fullscreenButton.onclick = run(async () => {
-      close();
+    toast(focusEnd ? "Twenty minutes, just you and your book." : "Reading timer stopped.");
+  });
+  act("toolFullscreen", () =>
+    run(async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
-    });
-  $("#homeTool").onclick = async () => {
-    close();
+    })()
+  );
+  act("toolGuide", showHelp);
+  act("toolTour", () => showTutorial(0));
+  act("toolHome", () => run(async () => {
     await save();
     showHome();
-  };
-  $("#guideTool").onclick = () => {
-    close();
-    showHelp();
-  };
-  $("#tutorialTool").onclick = () => {
-    close();
-    showTutorial(0);
-  };
-}
-
-// On phones a popover anchored to a hidden toolbar button lands off-screen;
-// focus mode therefore uses a regular dialog instead.
-function showMore() {
-  if (document.body.classList.contains("focus-mode")) {
-    $("#focusPanel").hidden = true;
-    $("#focusTools").setAttribute("aria-expanded", "false");
-    const d = dialog(
-      "Reader options",
-      `<div class="menu-list">${readerOptionsHtml()}</div>`,
+  })());
+  act("toolBookmark", () => editClip());
+  act("toolSound", () => $("#sound").click());
+  $("#toolFilmstrip").onclick = () => {
+    const show = $("#filmstrip").hidden;
+    $("#filmstrip").hidden = !show;
+    document.body.classList.toggle(
+      "focus-filmstrip",
+      show && document.body.classList.contains("focus-mode"),
     );
-    bindReaderOptions(() => d.close());
-    refreshIcons();
-    return;
-  }
-  popover($("#more"), readerOptionsHtml());
-  bindReaderOptions(() => ($("#popover").hidden = true));
+    $("#filmToggle").classList.toggle("active", show);
+    $("#toolFilmstrip").setAttribute("aria-pressed", String(show));
+    centerFilmOnPage();
+  };
+  $("#toolGoToPage").onclick = () => {
+    close();
+    const pageDialog = dialog(
+      "Go to page",
+      `<p class="muted">Enter a page from 1 to ${pdf.numPages}.</p><label class="field-label" for="focusPageInput">PAGE NUMBER</label><input id="focusPageInput" class="full-input" type="number" min="1" max="${pdf.numPages}" value="${page}">`,
+      `<button id="cancelFocusPage" class="secondary">Cancel</button><button id="goToFocusPage" class="primary">Go to page</button>`,
+    );
+    $("#focusPageInput").focus();
+    $("#focusPageInput").select();
+    $("#cancelFocusPage").onclick = () => pageDialog.close();
+    $("#goToFocusPage").onclick = run(async () => {
+      const target = Number($("#focusPageInput").value);
+      if (!Number.isInteger(target) || target < 1 || target > pdf.numPages) {
+        toast(`Choose a page from 1 to ${pdf.numPages}.`);
+        return;
+      }
+      await go(target);
+      pageDialog.close();
+    });
+  };
 }
 
 const tutorialSteps = [
@@ -2600,13 +2772,13 @@ const tutorialSteps = [
   {
     title: "Read without clutter.",
     eyebrow: "2 OF 3 · TURN & ZOOM",
-    text: "Turn pages with the arrows, a thumbnail, or by holding and dragging across the paper. Pinch to zoom and drag to pan. Double-tap toggles a closer look.",
+    text: "Turn pages with a thumbnail or by holding and dragging across the paper. Pinch to zoom and drag to pan. Double-tap toggles a closer look.",
     visual: "book-open",
   },
   {
     title: "Keep what matters.",
     eyebrow: "3 OF 3 · SELECT & HIGHLIGHT",
-    text: "Turn on Select text, then tap a word — twice for a sentence, three times for a paragraph. Highlight it, look up its meaning, copy, translate or comment. No marker or eraser needed.",
+    text: "Press and hold a word to select it, then keep dragging to extend the selection. Highlight it, look up its meaning, copy, translate or comment. No selection mode, no marker, no eraser.",
     visual: "type",
   },
 ];
@@ -2632,104 +2804,15 @@ function showTutorial(step = 0) {
   if (step) $("#tutorialBack").onclick = () => showTutorial(step - 1);
 }
 function updateFocusFilmstrip() {
-  const on = document.body.classList.contains("focus-filmstrip");
-  const control = $("#focusFilmstrip");
-  if (control) control.setAttribute("aria-pressed", String(on));
-  $("#filmToggle").classList.toggle("active", on || !$("#filmstrip").hidden);
-}
-function showFocusTools() {
-  const panel = $("#focusPanel"),
-    button = $("#focusTools");
-  const filmOn = document.body.classList.contains("focus-filmstrip");
-  panel.innerHTML = `<div class="focus-tools-head"><strong>Reader tools</strong><button id="minimizeFocusTools" class="icon-btn" aria-label="Minimize reader tools">${icon("minus")}</button></div><div class="focus-tools-row"><button id="focusLayout" class="chip">${icon("panels-top-left")}Layout</button><button id="focusTheme" class="chip">${icon("sun")}Theme</button><span id="focusPageLabel" class="chip chip-quiet">Page ${page} / ${pdf.numPages}</span></div><div class="focus-tools-grid"><button data-focus="selectText" aria-pressed="${textSelection}">${icon("type")}<span>${textSelection ? "Done selecting" : "Select text"}</span></button><button data-focus="bookmark">${icon("bookmark-plus")}<span>Bookmark page</span></button><button id="focusFilmstrip" aria-pressed="${filmOn}">${icon("gallery-horizontal-end")}<span>Page thumbnails</span></button><button data-focus="page">${icon("book-open")}<span>Go to page</span></button><button data-focus="sound">${icon(muted ? "volume-x" : "volume-2")}<span>${muted ? "Sound off" : "Page sound"}</span></button><button data-focus="more">${icon("ellipsis")}<span>Reader options</span></button><button data-focus="tutorial">${icon("circle-help")}<span>App guide</span></button><button data-focus="home">${icon("library-big")}<span>My library</span></button></div>`;
-  panel.hidden = false;
-  button.setAttribute("aria-expanded", "true");
-  $("#minimizeFocusTools").onclick = () => {
-    panel.hidden = true;
-    button.setAttribute("aria-expanded", "false");
-  };
-  panel.querySelectorAll("[data-focus]").forEach((el) => {
-    el.onclick = run(async () => {
-      switch (el.dataset.focus) {
-        case "selectText":
-          await toggleTextSelection();
-          if (textSelection) {
-            panel.hidden = true;
-            button.setAttribute("aria-expanded", "false");
-          }
-          break;
-        case "bookmark":
-          editClip();
-          break;
-        case "page": {
-          const pageDialog = dialog(
-            "Go to page",
-            `<p class="muted">Enter a page from 1 to ${pdf.numPages}.</p><label class="field-label" for="focusPageInput">PAGE NUMBER</label><input id="focusPageInput" class="full-input" type="number" min="1" max="${pdf.numPages}" value="${page}">`,
-            `<button id="cancelFocusPage" class="secondary">Cancel</button><button id="goToFocusPage" class="primary">Go to page</button>`,
-          );
-          $("#focusPageInput").focus();
-          $("#focusPageInput").select();
-          $("#cancelFocusPage").onclick = () => pageDialog.close();
-          $("#goToFocusPage").onclick = run(async () => {
-            const target = Number($("#focusPageInput").value);
-            if (
-              !Number.isInteger(target) ||
-              target < 1 ||
-              target > pdf.numPages
-            ) {
-              toast(`Choose a page from 1 to ${pdf.numPages}.`);
-              return;
-            }
-            await go(target);
-            pageDialog.close();
-          });
-          break;
-        }
-        case "sound":
-          $("#sound").click();
-          break;
-        case "more":
-          panel.hidden = true;
-          button.setAttribute("aria-expanded", "false");
-          showMore();
-          break;
-        case "tutorial":
-          panel.hidden = true;
-          button.setAttribute("aria-expanded", "false");
-          showHelp();
-          break;
-        case "home":
-          panel.hidden = true;
-          button.setAttribute("aria-expanded", "false");
-          await save();
-          showHome();
-          break;
-      }
-    });
-  });
-  $("#focusLayout").onclick = () => {
-    panel.hidden = true;
-    button.setAttribute("aria-expanded", "false");
-    toggleMenu("focusLayout", () => showLayout());
-  };
-  $("#focusTheme").onclick = () => {
-    panel.hidden = true;
-    button.setAttribute("aria-expanded", "false");
-    toggleMenu("focusTheme", () => showThemes());
-  };
-  $("#focusFilmstrip").onclick = () => {
-    const on = !document.body.classList.contains("focus-filmstrip");
-    document.body.classList.toggle("focus-filmstrip", on);
-    $("#filmstrip").hidden = !on;
-    updateFocusFilmstrip();
-  };
-  refreshIcons();
+  const control = $("#toolFilmstrip");
+  if (control) control.setAttribute("aria-pressed", String(!$("#filmstrip").hidden));
+  $("#filmToggle").classList.toggle("active", !$("#filmstrip").hidden);
 }
 function showHelp() {
   $("#popover").hidden = true;
   dialog(
     "Made for your fingertips.",
-    `<p>Turn pages by tapping the side arrows, tapping a thumbnail, or holding and dragging anywhere on the page. Drag left for the next page; drag right for the previous page. Manga mode reverses the direction.</p><div class="gesture-guide"><article><span>${icon("move-horizontal")}</span><strong>Turn a page</strong><small>Hold, then swipe across the paper.</small></article><article><span>${icon("hand")}</span><strong>Zoom & move</strong><small>Pinch to zoom; drag to pan. Double-tap to enlarge.</small></article><article><span>${icon("type")}</span><strong>Select & keep</strong><small>Tap once for a word, twice for a sentence, three times for a paragraph.</small></article><article><span>${icon("paperclip")}</span><strong>Save a thought</strong><small>Add a page clip to bookmark it and attach a note.</small></article></div><div class="info-note">In focus mode, tap <strong>Reader tools</strong> for thumbnails, page jumps, sound and the guided tour — without leaving the page.</div>`,
+    `<p>Turn pages by tapping a thumbnail or holding and dragging anywhere on the page. Drag left for the next page; drag right for the previous page. Manga mode reverses the direction.</p><div class="gesture-guide"><article><span>${icon("move-horizontal")}</span><strong>Turn a page</strong><small>Hold, then swipe across the paper.</small></article><article><span>${icon("hand")}</span><strong>Zoom & move</strong><small>Pinch to zoom; drag to pan. Double-tap to enlarge.</small></article><article><span>${icon("type")}</span><strong>Select & keep</strong><small>Press and hold a word, then drag to extend the selection.</small></article><article><span>${icon("paperclip")}</span><strong>Save a thought</strong><small>Add a page clip to bookmark it and attach a note.</small></article></div><div class="info-note"><strong>Reader tools</strong> in the top bar holds thumbnails, page jumps, appearance, backgrounds, sound and the guided tour. <strong>Find</strong> sits next to it.</div>`,
     `<button id="replayTutorial" class="secondary">Start the guided tour</button>`,
   );
   $("#replayTutorial").onclick = () => showTutorial(0);
@@ -2794,25 +2877,43 @@ async function prepareCurl(g) {
     await pointerEnd(g.releaseEvent, g.canceled);
 }
 const surface = $("#bookSurface");
-surface.addEventListener("contextmenu", (e) => {
-  e.preventDefault();
-  if (!textSelection && matchMedia("(max-width: 700px)").matches)
-    startTextSelectionModeAt(e.clientX, e.clientY).catch(fail);
-});
+surface.addEventListener("contextmenu", (e) => e.preventDefault());
 surface.addEventListener(
   "pointerdown",
   run(async (e) => {
     if (
       !ready ||
-      (textSelection && e.target.closest(".text-layer")) ||
       turning ||
       e.target.closest("button") ||
       (e.pointerType === "mouse" && e.button !== 0)
     )
       return;
+    if (!e.target.closest("#selectionActions, #selectionMenu")) {
+      if (selectionRange) {
+        // A tap anywhere on the page dismisses the selection, exactly like
+        // every other PDF reader, and does not turn a page.
+        clearSelection();
+        closeSelectionMenus();
+        lastTap = 0;
+        return;
+      }
+      clearHold();
+      hold = {
+        pointerId: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        timer: setTimeout(() => {
+          hold = null;
+          if (!ready || turning) return;
+          if (!beginSelectionAt(e.clientX, e.clientY, e.pointerId))
+            navigator.vibrate?.(0);
+        }, HOLD_MS),
+      };
+    }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     surface.setPointerCapture(e.pointerId);
     if (pointers.size === 2) {
+      clearHold();
       clearTimeout(holdTimer);
       if (curl.running) curl.cancel();
       const pts = [...pointers.values()];
@@ -2875,6 +2976,15 @@ surface.addEventListener(
 surface.addEventListener("pointermove", (e) => {
   const prev = pointers.get(e.pointerId);
   if (prev) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (selecting && selecting.pointerId === e.pointerId) {
+    e.preventDefault();
+    extendSelectionTo(e.clientX, e.clientY);
+    return;
+  }
+  if (hold && hold.pointerId === e.pointerId) {
+    if (Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 14) clearHold();
+    else return;
+  }
   if (!gesture) return;
   if (gesture.pinch && pointers.size === 2) {
     const pts = [...pointers.values()],
@@ -2918,7 +3028,13 @@ surface.addEventListener("pointermove", (e) => {
 });
 async function pointerEnd(e, cancel = false) {
   pointers.delete(e.pointerId);
+  clearHold();
   clearTimeout(holdTimer);
+  if (selecting && selecting.pointerId === e.pointerId) {
+    if (cancel) clearSelection();
+    else finishSelection();
+    return;
+  }
   if (!gesture) return;
   const g = gesture;
   if (g.pinch) {
@@ -3015,11 +3131,8 @@ $("#bookViewport").addEventListener(
 );
 function leaveFocusMode() {
   autoFocus = false;
-  if (textSelection) toggleTextSelection(false);
   document.body.classList.remove("focus-mode", "focus-filmstrip");
   fullscreen = false;
-  textSelection = false;
-  document.body.classList.remove("text-selection");
   $("#focusPanel").hidden = true;
   $("#focusTools").setAttribute("aria-expanded", "false");
   $("#filmstrip").hidden = false;
@@ -3047,7 +3160,7 @@ $("#resumeReference").onclick = () => {
   $("#reference").hidden = false;
 };
 $("#focusTools").onclick = () => {
-  if ($("#focusPanel").hidden) showFocusTools();
+  if ($("#focusPanel").hidden) openReaderTools();
   else {
     $("#focusPanel").hidden = true;
     $("#focusTools").setAttribute("aria-expanded", "false");
@@ -3063,14 +3176,11 @@ on("theme", () => toggleMenu("theme", showThemes));
 on("layout", () => toggleMenu("layout", showLayout));
 on("vault", showVault);
 on("export", () => toggleMenu("export", showExport));
-on("more", () => toggleMenu("more", showMore));
 on("import", () => $("#pdfFile").click());
 $("#homeImport").onclick = () => $("#pdfFile").click();
+$("#homeBackup").onclick = run(() => showVault());
 $("#crumbHome").onclick = run(() => showHome());
 $("#homeBrand").onclick = run(() => showHome());
-on("selectText", () => toggleTextSelection());
-on("prev", () => go(page - (rtl ? -1 : 1), true));
-on("next", () => go(page + (rtl ? -1 : 1), true));
 on("prevSmall", () => go(page - 1, true));
 on("nextSmall", () => go(page + 1, true));
 on("first", () => go(1));
@@ -3103,6 +3213,7 @@ on("filmToggle", () => {
   if (document.body.classList.contains("focus-mode"))
     document.body.classList.toggle("focus-filmstrip", !$("#filmstrip").hidden);
   $("#filmToggle").classList.toggle("active", !$("#filmstrip").hidden);
+  centerFilmOnPage();
   setTimeout(() => {
     cache.clear();
     render().catch(fail);
@@ -3279,6 +3390,7 @@ async function listenForSharedDocuments() {
       sessionStart = Date.now();
       baseSeconds = state.totalReadingTimeSeconds || 0;
     }
+    rotateArtwork();
   }).catch(() => {});
 }
 
@@ -3295,6 +3407,11 @@ async function init() {
     ? savedBackground
     : "black";
   applyBackground();
+  artwork = {
+    ...EMPTY_LIBRARY,
+    ...((await store.get("settings", "backgroundLibrary")) || {}),
+  };
+  applyArtwork();
   document.body.classList.toggle(
     "preserve-images",
     !!(await store.get("settings", "preserveImages")),

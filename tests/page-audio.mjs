@@ -83,54 +83,77 @@ const pageNum = (n) =>
       document.querySelector("#loading").hidden,
     n,
   );
+// The tour is marked seen just before it is shown, so the stored flag cannot
+// tell us whether the dialog is about to appear. Wait for either the dialog or
+// a painted library, then give the tour a beat to show up.
 async function dismissFirstRunTutorial() {
-  await p.waitForFunction(async () => {
-    if (document.querySelector("#dialog")?.open) return true;
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-    });
-    if (!db) return false;
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-      request.onerror = () => resolve(false);
-    });
-  });
-  if (await p.locator("#tutorialSkip").isVisible())
+  await p.waitForFunction(
+    () =>
+      document.querySelector("#dialog")?.open === true ||
+      document.querySelectorAll("#homeGrid .home-book").length > 0,
+    null,
+    { timeout: 40000 },
+  );
+  for (let i = 0; i < 20; i++) {
+    if (await p.evaluate(() => document.querySelector("#dialog")?.open === true))
+      break;
+    await p.waitForTimeout(100);
+  }
+  if (await p.locator("#tutorialSkip").isVisible().catch(() => false))
     await p.locator("#tutorialSkip").click();
-  await p.waitForFunction(async () => {
-    if (document.querySelector("#dialog")?.open) return false;
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
-    });
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("settings")
-        .objectStore("settings")
-        .get("tutorialSeen");
-      request.onsuccess = () => resolve(request.result === true);
-    });
-  });
+  await p.waitForFunction(
+    () => document.querySelector("#dialog")?.open !== true,
+    null,
+    { timeout: 20000 },
+  );
 }
+// Wait until the page the reader is showing has actually reached IndexedDB, so
+// a reload cannot race the save. (Playwright does not await async
+// waitForFunction predicates, so this polls with evaluate().)
+const persisted = async () => {
+  const wanted = Number(await p.locator("#pageInput").inputValue());
+  const readSavedPage = () =>
+    p.evaluate(async () => {
+      const db = await new Promise((resolve) => {
+        const request = indexedDB.open("FlipVaultDB");
+        request.onsuccess = () => resolve(request.result);
+      });
+      const rows = await new Promise((resolve) => {
+        const request = db
+          .transaction("readingState")
+          .objectStore("readingState")
+          .getAll();
+        request.onsuccess = () => resolve(request.result);
+      });
+      return rows[0]?.lastPage;
+    });
+  for (let i = 0; i < 100; i++) {
+    if ((await readSavedPage()) === wanted) return;
+    await p.waitForTimeout(100);
+  }
+  throw new Error(`page ${wanted} was never written to readingState`);
+};
+const pressKey = (key) =>
+  p.evaluate((key) => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+  }, key);
 const starts = (n) =>
   p.waitForFunction((n) => window.__pageAudio.starts.length === n, n);
 const metrics = () => p.evaluate(() => window.__pageAudio);
-async function toggleFocusSound() {
+async function openReaderTools() {
   if (await p.locator("#focusPanel").isHidden())
     await p.locator("#focusTools").click();
-  await p.locator('[data-focus="sound"]').click();
-  await p.locator("#focusTools").click();
+  await p.waitForFunction(() => document.querySelector("#focusPanel").hidden === false);
+}
+async function toggleFocusSound() {
+  await openReaderTools();
+  await p.locator("#toolSound").click();
+  await p.waitForFunction(() => document.querySelector("#focusPanel").hidden);
 }
 async function goToFocusPage(n) {
-  if (await p.locator("#focusPanel").isHidden())
-    await p.locator("#focusTools").click();
-  await p.locator('[data-focus="page"]').click();
+  await openReaderTools();
+  await p.locator("#toolGoToPage").click();
   await p.locator("#focusPageInput").fill(String(n));
   await p.locator("#goToFocusPage").click();
   await pageNum(n);
@@ -140,7 +163,7 @@ try {
   await enterReader();
   await ready();
   assert.equal((await metrics()).starts.length, 0);
-  await p.locator("#next").click();
+  await pressKey("ArrowRight");
   await pageNum(2);
   await starts(1);
   let m = await metrics();
@@ -155,31 +178,31 @@ try {
   console.log(
     "PASS actual MP3 decoding, gesture unlock, quiet-head trimming and original-pitch playback",
   );
-  await p.locator("#next").click();
+  await pressKey("ArrowRight");
   await pageNum(3);
   await starts(2);
   await toggleFocusSound();
   await p.waitForTimeout(100);
   assert.equal((await metrics()).active, 0);
-  await p.locator("#next").click();
+  await pressKey("ArrowRight");
   await pageNum(4);
   assert.equal((await metrics()).starts.length, 2);
   assert.ok((await metrics()).stops > 0);
   assert.equal((await metrics()).decodes, 1);
   console.log("PASS buffer reuse, immediate mute and silent muted page turns");
-  await p.waitForTimeout(600);
+  await persisted();
   await p.reload();
   await ready();
   await pageNum(4);
   assert.equal(await p.locator("#sound").getAttribute("aria-pressed"), "true");
-  await p.locator("#next").click();
+  await pressKey("ArrowRight");
   await pageNum(5);
   assert.equal((await metrics()).starts.length, 0);
   assert.equal((await metrics()).contexts, 0);
   await toggleFocusSound();
   await p.waitForFunction(() => window.__pageAudio.decodes === 1);
   assert.equal((await metrics()).starts.length, 0);
-  await p.locator("#next").click();
+  await pressKey("ArrowRight");
   await pageNum(6);
   await starts(1);
   console.log(
@@ -194,7 +217,7 @@ try {
   await p.waitForTimeout(1200);
   assert.equal(await p.locator("#pageInput").inputValue(), "6");
   assert.equal((await metrics()).starts.length, 1);
-  await p.keyboard.press("ArrowLeft");
+  await pressKey("ArrowLeft");
   await pageNum(5);
   await starts(2);
   await goToFocusPage(8);
@@ -240,7 +263,7 @@ try {
     await context.setOffline(true);
     await p.reload();
     await ready();
-    await p.locator("#prev").click();
+    await pressKey("ArrowLeft");
     await pageNum(7);
     await starts(1);
     console.log(

@@ -29,6 +29,15 @@ const ready = () =>
     },
     { timeout: 30000 },
   );
+// Press and hold, exactly like a finger on a word: the reader selects the
+// word under the pointer and keeps the selection mode open for a drag.
+const holdAt = async (x, y, ms = 520) => {
+  await p.mouse.move(x, y);
+  await p.mouse.down();
+  await p.waitForTimeout(ms);
+};
+const selectedWords = async () =>
+  (await p.locator("#selectionCount").getAttribute("aria-label")) || "";
 const pageNum = (n) =>
   p.waitForFunction(
     (n) => document.querySelector("#pageInput").value === String(n),
@@ -128,8 +137,8 @@ try {
   await p.locator("#homeContinueButton").click();
   await p.waitForFunction(() => !document.body.classList.contains("at-home"));
   await ready();
-  await p.locator("#more").click();
-  await p.locator("#referenceTool").click();
+  await p.locator("#focusTools").click();
+  await p.locator("#toolReference").click();
   await p.waitForFunction(() => !document.querySelector("#reference").hidden);
   assert.equal(await p.locator("#referenceCanvas").isVisible(), true);
   await p.locator("#minimizeReference").click();
@@ -143,11 +152,11 @@ try {
   );
   await p.locator("#closeReference").click();
   assert.equal(await p.locator("#reference").isVisible(), false);
-  await p.locator("#more").click();
-  await p.locator("#focusTimer").click();
+  await p.locator("#focusTools").click();
+  await p.locator("#toolTimer").click();
   assert.match(await p.locator("#sessionLabel").textContent(), /FOCUS/);
-  await p.locator("#more").click();
-  await p.locator("#focusTimer").click();
+  await p.locator("#focusTools").click();
+  await p.locator("#toolTimer").click();
   assert.doesNotMatch(await p.locator("#sessionLabel").textContent(), /FOCUS/);
   console.log(
     "PASS first-run tutorial, repeatable/minimizable overlays and settings menu",
@@ -180,19 +189,26 @@ try {
   const pdfBefore = await p
     .locator("#pdfCanvas")
     .evaluate((c) => c.toDataURL());
-  await p.locator("#selectText").click();
+  assert.equal(await p.locator("#selectText").count(), 0, "no select mode button");
+  assert.equal(await p.locator("#prev, #next, #more").count(), 0);
   await p.waitForFunction(
     () => document.querySelectorAll("#textLayer span").length > 2,
   );
   const firstSpan = await p.locator("#textLayer span").first().boundingBox();
   const lastSpan = await p.locator("#textLayer span").last().boundingBox();
   assert.ok(firstSpan && lastSpan, "page text layer exposes selectable runs");
-  await p.mouse.move(firstSpan.x + 2, firstSpan.y + firstSpan.height / 2);
-  await p.mouse.down();
+  await holdAt(firstSpan.x + 2, firstSpan.y + firstSpan.height / 2);
+  assert.match(await selectedWords(), /^1 word selected$/, "holding selects one word");
   await p.mouse.move(
     lastSpan.x + lastSpan.width - 2,
     lastSpan.y + lastSpan.height / 2,
     { steps: 12 },
+  );
+  await p.waitForTimeout(150);
+  assert.doesNotMatch(
+    await selectedWords(),
+    /^1 word selected$/,
+    "dragging past the first word extends the selection word by word",
   );
   await p.mouse.up();
   await p.waitForFunction(
@@ -250,7 +266,7 @@ try {
     "saved highlights are painted again after a reload",
   );
   console.log("PASS exact page, clips and highlights restored after reload");
-  await p.locator("#searchTop").click();
+  await p.locator("#focusSearch").click();
   assert.equal(await p.locator("#readerSearch").isVisible(), true);
   await p.locator("#searchInput").fill("attention");
   await p.waitForFunction(() =>
@@ -344,6 +360,143 @@ try {
   console.log(
     "PASS Drive-style full-document search, occurrence count, exact match highlighting and contextual actions",
   );
+  // --- the thumbnail strip follows the page you are on -------------------
+  await p.locator("#pageInput").fill("9");
+  await p.locator("#pageInput").press("Enter");
+  await pageNum(9);
+  await p.waitForFunction(
+    () =>
+      document.querySelector("#filmstrip .thumb.selected")?.dataset.page === "9",
+    null,
+    { timeout: 10000 },
+  );
+  await p.waitForTimeout(400);
+  assert.deepEqual(
+    await p.evaluate(() => {
+      const strip = document.querySelector("#filmstrip");
+      const thumb = strip.querySelector(".thumb.selected");
+      const s = strip.getBoundingClientRect(),
+        t = thumb.getBoundingClientRect();
+      return { page: thumb.dataset.page, visible: t.left >= s.left - 1 && t.right <= s.right + 1 };
+    }),
+    { page: "9", visible: true },
+    "the thumbnail strip highlights and shows the current page",
+  );
+  console.log("PASS thumbnails follow the page being read");
+
+  // --- dark reading themes ------------------------------------------------
+  await p.locator("#theme").click();
+  for (const id of ["cream", "mocha", "slate"])
+    assert.equal(await p.locator(`[data-theme="${id}"]`).count(), 1);
+  await p.locator('[data-theme="cream"]').click();
+  assert.equal(await p.locator("html").getAttribute("data-theme"), "cream");
+  assert.match(
+    await p.locator("#theme span").textContent(),
+    /Dark cream/,
+    "the toolbar shows the chosen theme",
+  );
+  const creamFilter = await p
+    .locator("#pdfCanvas")
+    .evaluate((c) => getComputedStyle(c).filter);
+  assert.match(creamFilter, /sepia/, "dark cream warms the rendered page");
+  await p.locator("#theme").click();
+  await p.locator('[data-theme="original"]').click();
+  console.log("PASS dark cream, mocha and slate themes apply to the page");
+
+  // --- reader artwork ----------------------------------------------------
+  await p.locator("#focusTools").click();
+  await p.locator("#toolBackground").click();
+  await p.waitForFunction(() => document.querySelector("#dialog")?.open);
+  assert.equal(await p.locator("#backgroundGrid .background-tile").count(), 1);
+  const artwork = (await p.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 1800;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#16302a";
+    ctx.fillRect(0, 0, 1200, 1800);
+    ctx.fillStyle = "#d7e6b8";
+    for (let i = 0; i < 30; i++) ctx.fillRect(40 + i * 38, 500 + Math.sin(i) * 180, 14, 700);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(binary);
+  }));
+  await p.locator("#artworkFile").setInputFiles({
+    name: "night-garden.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(artwork, "base64"),
+  });
+  await p.waitForFunction(
+    () => document.querySelectorAll("#backgroundGrid .background-tile").length === 2,
+    null,
+    { timeout: 15000 },
+  );
+  assert.equal(
+    await p.evaluate(() => document.documentElement.dataset.readerArt),
+    "on",
+    "the chosen artwork is painted behind the pages",
+  );
+  assert.match(
+    await p.evaluate(() =>
+      document.documentElement.style.getPropertyValue("--reader-art"),
+    ),
+    /^url\("data:image\/jpeg/,
+    "the stored artwork is re-encoded before it is used",
+  );
+  assert.equal(
+    await p.evaluate(async () => {
+      const db = await new Promise((resolve) => {
+        const request = indexedDB.open("FlipVaultDB");
+        request.onsuccess = () => resolve(request.result);
+      });
+      return await new Promise((resolve) => {
+        const request = db
+          .transaction("settings")
+          .objectStore("settings")
+          .get("backgroundLibrary");
+        request.onsuccess = () => resolve(request.result?.images?.length || 0);
+      });
+    }),
+    1,
+    "artwork is stored on this device and survives a reload",
+  );
+  // An image too small for a full-screen background is refused.
+  const tiny = (await p.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 240;
+    canvas.height = 240;
+    canvas.getContext("2d").fillRect(0, 0, 240, 240);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(binary);
+  }));
+  await p.locator("#artworkFile").setInputFiles({
+    name: "too-small.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(tiny, "base64"),
+  });
+  await p.waitForFunction(
+    () => /at least 800/.test(document.querySelector("#toast").textContent || ""),
+    null,
+    { timeout: 10000 },
+  );
+  assert.equal(
+    await p.locator("#backgroundGrid .background-tile").count(),
+    2,
+    "an image with the wrong dimensions is refused",
+  );
+  await p.locator("#closeBackgrounds").click();
+  console.log(
+    "PASS reader artwork is validated, stored, and painted behind the pages",
+  );
+
+  // --- reading-data backup from the library ------------------------------
   await p.locator("#vault").click();
   const backupPromise = p.waitForEvent("download");
   await p.locator("#downloadVault").click();
@@ -365,7 +518,11 @@ try {
   console.log("PASS annotated PDF exports valid 12-page PDF");
   await p.locator("#vaultFile").setInputFiles(backupPath);
   await p.waitForTimeout(1200);
-  assert.equal((await state()).lastPage, 2);
+  assert.equal(
+    (await state()).lastPage,
+    9,
+    "restoring the backup returns to the page that was saved",
+  );
   console.log("PASS vault restore round trip");
   await p.setViewportSize({ width: 393, height: 830 });
   await p.waitForTimeout(600);
@@ -373,6 +530,10 @@ try {
     await p.evaluate(() => document.documentElement.scrollWidth),
     393,
   );
+  await p.locator("#pageInput").fill("2");
+  await p.locator("#pageInput").press("Enter");
+  await pageNum(2);
+  await p.waitForTimeout(400);
   r = await p.locator("#rightPage").boundingBox();
   await p.mouse.move(r.x + r.width - 2, r.y + r.height * 0.85);
   await p.mouse.down();
@@ -457,23 +618,27 @@ try {
   await p.locator("#focusTools").click();
   assert.equal(await p.locator("#focusPanel").isVisible(), true);
   assert.equal(await p.locator("#focusTools svg").count(), 1);
-  assert.equal(await p.locator('[data-focus="bookmark"] svg').count(), 1);
+  assert.equal(await p.locator("#toolBookmark svg").count(), 1);
   for (const id of [
-    "selectText",
-    "bookmark",
-    "page",
-    "sound",
-    "more",
-    "tutorial",
-    "home",
+    "toolLayout",
+    "toolTheme",
+    "toolBackground",
+    "toolFilmstrip",
+    "toolGoToPage",
+    "toolBookmark",
+    "toolReference",
+    "toolSound",
+    "toolTimer",
+    "toolGuide",
+    "toolTour",
+    "toolHome",
   ])
     assert.equal(
-      await p.locator(`[data-focus="${id}"]`).count(),
+      await p.locator(`#${id}`).count(),
       1,
-      `missing focus action ${id}`,
+      `missing reader tool ${id}`,
     );
-  assert.equal(await p.locator("#focusFilmstrip").count(), 1);
-  assert.equal(await p.locator('[data-focus="selectText"]').count(), 1);
+  assert.equal(await p.locator('[data-focus="selectText"]').count(), 0);
   const openFocusTools = async () => {
     if (await p.locator("#focusPanel").isVisible()) return;
     await p.locator("#focusTools").click();
@@ -481,19 +646,10 @@ try {
       () => document.querySelector("#focusPanel").hidden === false,
     );
   };
-  await p.locator('[data-focus="bookmark"]').click();
+  await p.locator("#toolBookmark").click();
   assert.equal(await p.locator("#dialog").isVisible(), true);
   assert.equal(await p.locator("#clipNote").count(), 1);
   await p.locator("#closeDialog").click();
-  await openFocusTools();
-  await p.locator('[data-focus="selectText"]').click();
-  await p.waitForFunction(
-    () => document.querySelectorAll("#textLayer span").length > 0,
-  );
-  assert.equal(
-    await p.locator("#selectText").getAttribute("aria-pressed"),
-    "true",
-  );
   const findWord = () =>
     p.evaluate(() => {
       const blocked = [
@@ -544,8 +700,7 @@ try {
       await p.waitForTimeout(250);
       continue;
     }
-    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await p.mouse.down();
+    await holdAt(box.x + box.width / 2, box.y + box.height / 2);
     await p.mouse.up();
     selected = await p
       .waitForFunction(
@@ -556,11 +711,11 @@ try {
       .then(() => true)
       .catch(() => false);
   }
-  assert.ok(selected, "tapping a word opens the selection bar");
+  assert.ok(selected, "holding a word opens the selection bar");
   const copiedPassage = await p
     .locator("#selectionCount")
     .getAttribute("title");
-  assert.ok(copiedPassage.length > 0, "tapping a word selects it");
+  assert.ok(copiedPassage.length > 0, "holding a word selects it");
   await p.evaluate(() => {
     window.__copiedSelection = "";
     Object.defineProperty(navigator, "clipboard", {
@@ -620,27 +775,32 @@ try {
   assert.match(await p.locator(".selected-quote").textContent(), /.+/);
   await p.locator("#clipNote").fill("Comment anchored to this passage");
   await p.locator("#saveClip").click();
-  await p.waitForFunction(async () => {
-    const db = await new Promise((resolve) => {
-      const request = indexedDB.open("FlipVaultDB");
-      request.onsuccess = () => resolve(request.result);
+  // Playwright does not await async waitForFunction predicates, so poll the
+  // database from Node instead of trusting a promise-returning predicate.
+  for (let i = 0; ; i++) {
+    const saved = await p.evaluate(async () => {
+      const db = await new Promise((resolve) => {
+        const request = indexedDB.open("FlipVaultDB");
+        request.onsuccess = () => resolve(request.result);
+      });
+      const rows = await new Promise((resolve) => {
+        const request = db
+          .transaction("readingState")
+          .objectStore("readingState")
+          .getAll();
+        request.onsuccess = () => resolve(request.result);
+      });
+      return rows.some((item) =>
+        (item.paperclips || []).some(
+          (clip) =>
+            clip.quote && clip.note === "Comment anchored to this passage",
+        ),
+      );
     });
-    return await new Promise((resolve) => {
-      const request = db
-        .transaction("readingState")
-        .objectStore("readingState")
-        .getAll();
-      request.onsuccess = () =>
-        resolve(
-          request.result.some((item) =>
-            item.paperclips.some(
-              (clip) =>
-                clip.quote && clip.note === "Comment anchored to this passage",
-            ),
-          ),
-        );
-    });
-  });
+    if (saved) break;
+    if (i > 60) throw new Error("the anchored comment was never saved");
+    await p.waitForTimeout(100);
+  }
   await p.locator("#moreSelection").click();
   await p.locator("#selectAllSelection").click();
   assert.ok(
@@ -654,18 +814,21 @@ try {
   );
   await p.locator("#clearSelection").click();
   await openFocusTools();
-  await p.locator('[data-focus="selectText"]').click();
   assert.equal(
-    await p.locator("#selectText").getAttribute("aria-pressed"),
-    "false",
+    await p.locator("#toolFilmstrip").getAttribute("aria-pressed"),
+    "true",
+    "the tools panel reports that thumbnails are showing",
   );
-  await p.locator("#focusFilmstrip").click();
+  await p.locator("#toolFilmstrip").click();
   assert.equal(
     await p
       .locator("body")
       .evaluate((el) => el.classList.contains("focus-filmstrip")),
-    true,
+    false,
+    "the thumbnail toggle hides the strip",
   );
+  assert.equal(await p.locator("#toolFilmstrip").getAttribute("aria-pressed"), "false");
+  await p.locator("#toolFilmstrip").click();
   assert.equal(await p.locator("#filmstrip").isVisible(), true);
   await p.locator("#minimizeFocusTools").click();
   assert.equal(await p.locator("#focusPanel").isVisible(), false);
@@ -688,7 +851,6 @@ try {
     { timeout: 30000 },
   );
   await p.waitForFunction(() => document.querySelector("#loading").hidden);
-  await p.locator("#selectText").click();
   await p.waitForFunction(
     () => document.querySelectorAll("#textLayer span").length > 0,
   );
@@ -716,8 +878,7 @@ try {
     endTextBox && endTextBox.x + endTextBox.width > textBox.x + textBox.width,
     "selection layer follows the sentence's reading order",
   );
-  await p.mouse.move(textBox.x + 1, textBox.y + textBox.height / 2);
-  await p.mouse.down();
+  await holdAt(textBox.x + 1, textBox.y + textBox.height / 2);
   await p.mouse.move(
     endTextBox.x + endTextBox.width - 1,
     endTextBox.y + endTextBox.height / 2,
@@ -732,7 +893,6 @@ try {
     (await p.locator("#selectionLayer .selection-rect").count()) > 0,
     "drag selection paints overlay rectangles",
   );
-  await p.locator("#selectText").click();
   console.log(
     "PASS reflowed multilingual text and accurate drag-to-select page overlays",
   );
@@ -763,7 +923,6 @@ try {
     { timeout: 30000 },
   );
   await p.waitForFunction(() => document.querySelector("#loading").hidden);
-  await p.locator("#selectText").click();
   await p.waitForFunction(
     () => document.querySelectorAll("#textLayer span").length > 0,
   );
@@ -771,7 +930,6 @@ try {
     await p.locator("#textLayer").textContent(),
     /Open standards books/,
   );
-  await p.locator("#selectText").click();
   console.log(
     "PASS EPUB container, metadata, reading order and Unicode chapter conversion",
   );
@@ -787,7 +945,6 @@ try {
     { timeout: 30000 },
   );
   await p.waitForFunction(() => document.querySelector("#loading").hidden);
-  await p.locator("#selectText").click();
   await p.waitForFunction(
     () => document.querySelectorAll("#textLayer span").length > 0,
   );
@@ -796,7 +953,6 @@ try {
     /HTML text is extracted/,
   );
   assert.equal(await p.evaluate(() => window.__unsafeHtmlRan), undefined);
-  await p.locator("#selectText").click();
   console.log(
     "PASS safe HTML text import strips executable content and retains headings",
   );
@@ -935,11 +1091,7 @@ try {
   );
   assert.equal(await p.locator("#focusSearch").isVisible(), true);
   assert.equal(await p.locator("#filmstrip").isVisible(), true);
-  assert.equal(
-    await p.locator("#selectText").getAttribute("aria-pressed"),
-    "false",
-  );
-  await p.locator("#selectText").click();
+  assert.equal(await p.locator("#selectText").count(), 0);
   await p.waitForFunction(
     () => document.querySelectorAll("#textLayer span").length > 0,
   );
@@ -952,31 +1104,16 @@ try {
     sampleTextBox,
     "the imported PDF exposes a visible selectable text run",
   );
-  await p.locator("#selectText").click();
-  await p.evaluate(
-    ({ x, y }) => {
-      document.querySelector("#pdfCanvas").dispatchEvent(
-        new MouseEvent("contextmenu", {
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-        }),
-      );
-    },
-    {
-      x: sampleTextBox.x + sampleTextBox.width / 2,
-      y: sampleTextBox.y + sampleTextBox.height / 2,
-    },
+  // A phone reader selects with a plain press and hold — no mode to switch on.
+  await holdAt(
+    sampleTextBox.x + sampleTextBox.width / 2,
+    sampleTextBox.y + sampleTextBox.height / 2,
   );
-  await p.waitForFunction(
-    () =>
-      document.querySelector("#selectText").getAttribute("aria-pressed") ===
-      "true",
-  );
+  await p.mouse.up();
   await p.waitForFunction(
     () => !document.querySelector("#selectionActions").hidden,
   );
+  assert.match(await selectedWords(), /word/);
   assert.ok(
     (await p.locator("#selectionCount").getAttribute("title")).length > 0,
   );

@@ -414,32 +414,6 @@ h1 {
   inset: 0;
   pointer-events: none;
 }
-.page-nav {
-  width: 35px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  position: absolute;
-  top: calc(50% - 40px);
-  z-index: 5;
-  color: #a7b8a3;
-}
-.page-nav svg {
-  width: 26px;
-  height: 26px;
-  stroke-width: 1;
-}
-.page-nav:hover {
-  color: var(--accent);
-  background: #d3e7ab0b;
-  border-radius: 20px;
-}
-.previous {
-  left: 12px;
-}
-.next {
-  right: 12px;
-}
 .stage-caption {
   position: absolute;
   bottom: 14px;
@@ -1411,8 +1385,33 @@ textarea {
 .focus-mode .stage-caption {
   opacity: 0.3;
 }
+/* Paper themes. Every one only filters the rendered page, so the PDF file
+   itself never changes; the surrounding stage gets a matching tint. */
 :root[data-theme="sepia"] .page > canvas:first-child {
-  filter: sepia(0.45);
+  filter: sepia(0.6) saturate(1.25) contrast(1.35) brightness(0.9);
+}
+:root[data-theme="sepia"] .stage {
+  background: #241c14;
+}
+:root[data-theme="cream"] .page > canvas:first-child {
+  filter: invert(1) sepia(0.55) saturate(2) hue-rotate(-15deg) brightness(0.92)
+    contrast(1.05);
+}
+:root[data-theme="cream"] .stage {
+  background: #14100c;
+}
+:root[data-theme="mocha"] .page > canvas:first-child {
+  filter: invert(1) sepia(0.75) saturate(2.4) hue-rotate(-20deg) brightness(0.78)
+    contrast(1.08);
+}
+:root[data-theme="mocha"] .stage {
+  background: #100d09;
+}
+:root[data-theme="slate"] .page > canvas:first-child {
+  filter: invert(1) hue-rotate(180deg) saturate(0.6) brightness(0.92) contrast(1.1);
+}
+:root[data-theme="slate"] .stage {
+  background: #0b0f12;
 }
 :root[data-theme="dark"] {
   background: #060b09;
@@ -1421,7 +1420,7 @@ textarea {
   background: #060b09;
 }
 :root[data-theme="dark"] .page > canvas:first-child {
-  filter: invert(0.9) hue-rotate(180deg);
+  filter: invert(1) hue-rotate(180deg);
 }
 :root[data-theme="dark"] .annotation {
   mix-blend-mode: screen;
@@ -1776,18 +1775,6 @@ textarea {
     height: calc(100dvh - 416px);
     min-height: 290px;
   }
-  .page-nav {
-    width: 23px;
-  }
-  .previous {
-    left: -5px;
-  }
-  .next {
-    right: -5px;
-  }
-  .page-nav svg {
-    width: 21px;
-  }
   .book-viewport {
     padding: 24px 22px 35px;
   }
@@ -1957,35 +1944,10 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
-.focus-return {
-  display: none;
-  position: fixed;
-  top: 83px;
-  right: 25px;
-  z-index: 32;
-  align-items: center;
-  gap: 8px;
-  background: #284132e6;
-  border: 1px solid #c9dda64d;
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 10px;
-  color: #d6e8ba;
-}
-.focus-return svg {
-  width: 14px;
-}
-.focus-mode .focus-return {
-  display: flex;
-}
 .focus-mode.hud-idle .reader-toolbar,
-.focus-mode.hud-idle .stage-caption,
-.focus-mode.hud-idle .focus-return {
+.focus-mode.hud-idle .stage-caption {
   opacity: 0;
   transition: opacity 0.4s;
-}
-.focus-mode .focus-return:focus-visible {
-  opacity: 1;
 }
 .book-viewport:has(.book-surface[style*="--zoom: 2"]),
 .book-viewport:has(.book-surface[style*="--zoom: 3"]),
@@ -2064,8 +2026,7 @@ textarea {
 :root[data-background] .drawer,
 :root[data-background] .popover,
 :root[data-background] dialog,
-:root[data-background] .reference,
-:root[data-background] .focus-return {
+:root[data-background] .reference {
   background: var(--surface-bg);
 }
 :root[data-background] .stage-ambient {
@@ -2119,33 +2080,6 @@ textarea {
 }
 
 /* Persistent, touch-first controls for the reader's immersive mode. */
-.focus-tools-button {
-  display: none;
-  position: fixed;
-  top: 132px;
-  right: 16px;
-  z-index: 42;
-  min-height: 46px;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  padding: 0 14px;
-  color: #e4edce;
-  background: #111b18f2;
-  border: 1px solid #c9dda64d;
-  border-radius: 13px;
-  box-shadow: 0 6px 28px #0008;
-  font-size: 13px;
-  touch-action: manipulation;
-}
-.focus-tools-button svg {
-  width: 19px;
-  height: 19px;
-}
-.focus-mode .focus-tools-button {
-  display: flex;
-}
-.focus-tools-button:focus-visible,
 .focus-tools-panel button:focus-visible,
 .resume-popup:focus-visible {
   outline: 2px solid var(--accent);
@@ -2153,7 +2087,7 @@ textarea {
 }
 .focus-tools-panel {
   position: fixed;
-  top: 188px;
+  top: 62px;
   right: 16px;
   z-index: 43;
   width: min(330px, calc(100vw - 28px));
@@ -2208,30 +2142,17 @@ textarea {
   border-color: #c9dda6aa;
   background: #c9dda61d;
 }
+/* Layout, theme and backgrounds all live in Reader tools, so the separate
+   toolbar has no job in focus mode. */
 .focus-mode .reader-toolbar {
-  opacity: 1;
-  background: #101916f5;
-  box-shadow: 0 8px 24px #0005;
-}
-.focus-mode .reader-toolbar:hover {
-  opacity: 1;
+  display: none;
 }
 .focus-mode .stage-caption {
   opacity: 0.8;
 }
 .focus-mode.hud-idle .reader-toolbar,
-.focus-mode.hud-idle .stage-caption,
-.focus-mode.hud-idle .focus-return {
+.focus-mode.hud-idle .stage-caption {
   opacity: 1;
-}
-.focus-mode .page-nav {
-  z-index: 14;
-  width: 48px;
-  height: 64px;
-  color: #d8e7bd;
-  background: #101916cc;
-  border: 1px solid #ffffff18;
-  border-radius: 18px;
 }
 .focus-mode.focus-filmstrip .bottom-panel {
   display: block;
@@ -2314,10 +2235,6 @@ textarea {
 .resume-menu {
   bottom: auto;
   top: 132px;
-}
-.focus-return {
-  min-height: 46px;
-  font-size: 13px;
 }
 .dialog-body {
   max-height: min(65dvh, 620px);
@@ -2409,14 +2326,8 @@ textarea {
   align-items: center;
 }
 @media (max-width: 600px) {
-  .focus-tools-button {
-    top: 112px;
-    right: 10px;
-    min-height: 44px;
-    padding: 0 12px;
-  }
   .focus-tools-panel {
-    top: 166px;
+    top: 58px;
     right: 10px;
     width: min(330px, calc(100vw - 20px));
   }
@@ -2440,31 +2351,8 @@ textarea {
     margin-right: auto;
   }
 }
-.focus-mode .focus-return {
-  top: 118px;
-  left: 16px;
-  right: auto;
-}
-.focus-mode .focus-tools-button {
-  top: 118px;
-  right: 16px;
-}
 .focus-mode .focus-tools-panel {
-  top: 174px;
-}
-@media (max-width: 600px) {
-  .focus-mode .focus-return {
-    top: 118px;
-    left: 10px;
-    right: auto;
-  }
-  .focus-mode .focus-tools-button {
-    top: 118px;
-    right: 10px;
-  }
-  .focus-mode .focus-tools-panel {
-    top: 174px;
-  }
+  top: 58px;
 }
 
 /* Selectable PDF.js text remains inert until the reader explicitly enters selection mode. */
@@ -2488,26 +2376,10 @@ textarea {
   white-space: pre;
   transform-origin: 0 0;
 }
-.text-selection .text-layer {
+/* The text layer is always hit-testable so the reader can resolve a caret
+   under the finger; the browser's own selection stays switched off. */
+.text-layer {
   pointer-events: auto;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.text-selection .text-layer span,
-.text-selection .text-layer br {
-  cursor: text;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.text-selection .book-surface {
-  touch-action: pan-x pan-y;
-}
-.text-selection #stage {
-  cursor: text;
-}
-.text-selection ::selection {
-  color: transparent;
-  background: #b5ccff80;
 }
 .selection-actions {
   position: fixed;
@@ -2529,7 +2401,8 @@ textarea {
   display: none;
 }
 .selection-actions span {
-  max-width: min(190px, 34vw);
+  max-width: min(96px, 30vw);
+  font-variant-numeric: tabular-nums;
   overflow: hidden;
   color: #b5c2ad;
   text-overflow: ellipsis;
@@ -2556,10 +2429,11 @@ textarea {
   .selection-actions {
     gap: 3px;
     padding: 5px;
+    flex-wrap: wrap;
   }
+  /* No room for a counter chip next to seven touch targets. */
   .selection-actions span {
-    max-width: 80px;
-    font-size: 10px;
+    display: none;
   }
   .selection-actions button {
     padding: 0 8px;
@@ -2649,13 +2523,7 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 .focus-search {
-  display: none;
-  position: fixed;
-  top: max(64px, env(safe-area-inset-top));
-  right: max(14px, env(safe-area-inset-right));
-  z-index: 41;
-  min-width: 48px;
-  min-height: 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -2671,12 +2539,6 @@ textarea {
 .focus-search svg {
   width: 18px;
   height: 18px;
-}
-.focus-mode .focus-search {
-  display: flex;
-}
-.focus-mode.search-open .focus-search {
-  display: none;
 }
 ::highlight(flipvault-search-match) {
   color: #19180f;
@@ -2757,9 +2619,6 @@ textarea {
   font-size: 11px;
   line-height: 1.4;
 }
-.focus-mode.hud-idle .focus-return {
-  opacity: 1;
-}
 @media (max-width: 390px) {
   .selection-actions {
     gap: 1px;
@@ -2816,8 +2675,40 @@ body {
 .at-home .workspace-header,
 .at-home .reader-toolbar,
 .at-home .stage,
-.at-home .bottom-panel {
+.at-home .bottom-panel,
+.at-home #focusSearch,
+.at-home #focusTools,
+.at-home #exitFocus {
   display: none !important;
+}
+.at-home #focusPanel {
+  display: none !important;
+}
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.home-backup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 15px;
+  border-radius: 11px;
+  border: 1px solid #ffffff1f;
+  background: #ffffff0a;
+  color: #dce8d2;
+  font-size: 12.5px;
+}
+.home-backup:hover {
+  border-color: #c9dda64d;
+  color: var(--accent);
+}
+.home-backup svg {
+  width: 16px;
+  height: 16px;
 }
 .home-hero {
   display: flex;
@@ -3018,15 +2909,8 @@ body {
   -webkit-touch-callout: none;
   z-index: 4;
 }
-.text-selection .text-layer {
-  pointer-events: auto;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.text-selection .text-layer span {
+.text-layer span {
   cursor: text;
-  user-select: none;
-  -webkit-user-select: none;
 }
 ::selection {
   background: transparent;
@@ -3387,4 +3271,199 @@ body {
   background: none;
   border-color: transparent;
   cursor: default;
+}
+
+/* --- Compact reader chrome ------------------------------------------------
+   Find, Reader tools and Exit focus live in the top bar for both layouts.
+   They are plain icon buttons: nothing floats over the page any more. */
+.top-actions .top-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: #c3d3c0;
+  border: 1px solid #ffffff14;
+  background: #ffffff08;
+}
+.top-actions .top-icon:hover {
+  color: var(--accent);
+  border-color: #c9dda63d;
+}
+.top-actions .top-icon[aria-expanded="true"] {
+  color: #12180f;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#exitFocus {
+  display: none;
+}
+.focus-mode #exitFocus {
+  display: inline-flex;
+}
+.focus-mode .topbar {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 46;
+  height: auto;
+  justify-content: flex-end;
+  padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+  border: 0;
+  background: linear-gradient(180deg, #0a1210d9, #0a121000);
+}
+.focus-mode .topbar .wordmark,
+.focus-mode .topbar .breadcrumb,
+.focus-mode .topbar .vault-pill,
+.focus-mode .topbar .import-btn {
+  display: none;
+}
+.focus-mode .top-actions {
+  gap: 6px;
+}
+.focus-tools-panel {
+  max-height: min(72dvh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* --- Reader artwork -------------------------------------------------------
+   Backgrounds chosen by the reader, for the library, the reading room, or
+   both. Images are cover-cropped and dimmed by a reader-set amount so text
+   stays legible. */
+:root {
+  --home-art: none;
+  --reader-art: none;
+  --art-dim: 0.62;
+}
+.home {
+  position: relative;
+  isolation: isolate;
+}
+:root[data-home-art="on"] .home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--home-art);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+:root[data-home-art="on"] .home::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgb(7 12 10 / var(--art-dim));
+}
+:root[data-reader-art="on"] .stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--reader-art);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+:root[data-reader-art="on"] .stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgb(7 12 10 / var(--art-dim));
+}
+:root[data-reader-art="on"] .stage-ambient {
+  opacity: 0;
+}
+.background-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.background-tile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #ffffff1f;
+  background: #101815;
+  color: #e7efd9;
+  font-size: 11px;
+}
+.background-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.background-tile span {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 16px 8px 7px;
+  background: linear-gradient(transparent, #050807e6);
+  text-align: left;
+}
+.background-tile[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px #c9dda64d;
+}
+.background-tile.background-none {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
+}
+.background-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.background-note {
+  color: #9aab9c;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.background-preview {
+  width: 100%;
+  aspect-ratio: 21 / 8;
+  border-radius: 12px;
+  border: 1px solid #ffffff1f;
+  background: #0d1412 center / cover no-repeat;
+  margin: 6px 0 12px;
+}
+
+/* Theme menu entries carry a hint line under each name. */
+.menu-item .menu-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+.menu-copy > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.menu-copy strong {
+  font-weight: 500;
+}
+.menu-copy small {
+  color: #8ea395;
+  font-size: 10.5px;
+  line-height: 1.35;
+  white-space: normal;
+}
+.focus-tools-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 8px;
 }

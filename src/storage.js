@@ -155,7 +155,9 @@ export function validateState(s) {
     bad();
   if (
     s.theme !== undefined &&
-    !["original", "sepia", "dark", "ink"].includes(s.theme)
+    !["original", "sepia", "cream", "mocha", "slate", "dark", "ink"].includes(
+      s.theme,
+    )
   )
     bad();
   if (

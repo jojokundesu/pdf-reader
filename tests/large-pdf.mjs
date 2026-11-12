@@ -67,9 +67,9 @@ try {
     undefined,
     { timeout: 30000 },
   );
-  await page.locator("#focusTools").click();
   for (const n of [500, 1000, 1]) {
-    await page.locator('[data-focus="page"]').click();
+    await page.locator("#focusTools").click();
+    await page.locator("#toolGoToPage").click();
     await page.locator("#focusPageInput").fill(String(n));
     await page.locator("#goToFocusPage").click();
     await page.waitForFunction(
